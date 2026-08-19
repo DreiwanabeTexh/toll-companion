@@ -14,6 +14,7 @@ class BriefingService {
       _customFirestoreService ?? FirestoreService();
 
   /// Fetches the route briefing for a specific route ID.
+  /// Automatically falls back to default route briefings if offline or unpopulated.
   Stream<RouteBriefing?> getBriefingForRoute(String routeId) {
     return _firestoreService.routeBriefingsRef
         .where('routeId', isEqualTo: routeId)
@@ -21,31 +22,17 @@ class BriefingService {
         .limit(1)
         .snapshots()
         .map((snapshot) {
-      if (snapshot.docs.isEmpty) return null;
+      if (snapshot.docs.isEmpty) {
+        // Fallback to static predefined briefings for this route
+        final matches = defaultBriefings.where((b) => b.routeId == routeId);
+        return matches.isNotEmpty ? matches.first : null;
+      }
       return snapshot.docs.first.data();
     });
   }
 
-  /// Fetches all active route briefings.
-  Stream<List<RouteBriefing>> getAllBriefings() {
-    return _firestoreService.routeBriefingsRef
-        .where('isActive', isEqualTo: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
-  }
-
-  /// Seeds general-purpose route briefings if collection is empty.
-  ///
-  /// TODO(data): All briefing entries below are placeholders for route structure verification.
-  Future<void> seedPlaceholderDataIfEmpty() async {
-    final existing =
-        await _firestoreService.routeBriefingsRef.limit(1).get();
-    if (existing.docs.isNotEmpty) {
-      return; // Already seeded
-    }
-
-    // TODO(data): Sample briefings for the 3 sample routes
-    final sampleBriefings = [
+  /// Default static route briefings for offline fallback and initial seeding.
+  static final List<RouteBriefing> defaultBriefings = [
       RouteBriefing(
         id: 'briefing_sample_route_multi_operator',
         routeId: 'sample_route_multi_operator',
@@ -173,9 +160,17 @@ class BriefingService {
         lastUpdated: DateTime(2025, 1, 15),
         isActive: true,
       ),
-    ];
+  ];
 
-    for (final briefing in sampleBriefings) {
+  /// Seeds general-purpose route briefings if collection is empty.
+  Future<void> seedPlaceholderDataIfEmpty() async {
+    final existing =
+        await _firestoreService.routeBriefingsRef.limit(1).get();
+    if (existing.docs.isNotEmpty) {
+      return; // Already seeded
+    }
+
+    for (final briefing in defaultBriefings) {
       await _firestoreService.routeBriefingsRef.doc(briefing.id).set(briefing);
     }
   }

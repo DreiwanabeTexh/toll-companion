@@ -1,20 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/toll_plaza.dart';
 import '../models/toll_segment.dart';
 import '../models/route_model.dart';
 import '../models/emergency_contact.dart';
 import '../models/guide_entry.dart';
 import '../models/checklist_item.dart';
 import '../models/route_briefing.dart';
+import '../models/data_report.dart';
 
 /// Central access point for Cloud Firestore collections.
 ///
 /// Follows collection definitions in data-model.md:
+/// - `tollPlazas` (Phase 4 exit graph)
 /// - `tollSegments`
 /// - `routes`
 /// - `emergencyContacts`
 /// - `guideEntries`
 /// - `checklistItems` (Phase 2)
 /// - `routeBriefings` (Phase 2)
+/// - `dataReports` (Phase 3 write-only)
 class FirestoreService {
   final FirebaseFirestore? _customFirestore;
 
@@ -23,6 +27,12 @@ class FirestoreService {
 
   FirebaseFirestore get _firestore =>
       _customFirestore ?? FirebaseFirestore.instance;
+
+  CollectionReference<TollPlaza> get tollPlazasRef =>
+      _firestore.collection('tollPlazas').withConverter<TollPlaza>(
+            fromFirestore: (snapshot, _) => TollPlaza.fromFirestore(snapshot),
+            toFirestore: (plaza, _) => plaza.toFirestore(),
+          );
 
   CollectionReference<TollSegment> get tollSegmentsRef =>
       _firestore.collection('tollSegments').withConverter<TollSegment>(
@@ -61,5 +71,11 @@ class FirestoreService {
             fromFirestore: (snapshot, _) =>
                 RouteBriefing.fromFirestore(snapshot),
             toFirestore: (briefing, _) => briefing.toFirestore(),
+          );
+
+  CollectionReference<DataReport> get dataReportsRef =>
+      _firestore.collection('dataReports').withConverter<DataReport>(
+            fromFirestore: (snapshot, _) => DataReport.fromFirestore(snapshot),
+            toFirestore: (report, _) => report.toFirestore(),
           );
 }

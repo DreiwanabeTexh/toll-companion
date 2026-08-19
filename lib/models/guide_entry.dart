@@ -29,8 +29,19 @@ class GuideEntry {
 
   factory GuideEntry.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
+    return GuideEntry.fromMap(doc.id, data);
+  }
+
+  factory GuideEntry.fromMap(String id, Map<String, dynamic> data) {
+    DateTime updatedDate = DateTime.now();
+    if (data['lastUpdated'] is Timestamp) {
+      updatedDate = (data['lastUpdated'] as Timestamp).toDate();
+    } else if (data['lastUpdated'] is String) {
+      updatedDate = DateTime.tryParse(data['lastUpdated'] as String) ?? DateTime.now();
+    }
+
     return GuideEntry(
-      id: doc.id,
+      id: id,
       title: data['title'] as String? ?? '',
       shortTitle: data['shortTitle'] as String? ?? '',
       category: data['category'] as String? ?? 'general',
@@ -38,9 +49,7 @@ class GuideEntry {
       sortOrder: (data['sortOrder'] as num?)?.toInt() ?? 0,
       tags: List<String>.from(data['tags'] as List? ?? []),
       isActive: data['isActive'] as bool? ?? true,
-      lastUpdated: data['lastUpdated'] is Timestamp
-          ? (data['lastUpdated'] as Timestamp).toDate()
-          : DateTime.now(),
+      lastUpdated: updatedDate,
     );
   }
 
@@ -55,5 +64,23 @@ class GuideEntry {
       'isActive': isActive,
       'lastUpdated': Timestamp.fromDate(lastUpdated),
     };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'shortTitle': shortTitle,
+      'category': category,
+      'content': content,
+      'sortOrder': sortOrder,
+      'tags': tags,
+      'isActive': isActive,
+      'lastUpdated': lastUpdated.toIso8601String(),
+    };
+  }
+
+  factory GuideEntry.fromJson(Map<String, dynamic> json) {
+    return GuideEntry.fromMap(json['id'] as String? ?? '', json);
   }
 }

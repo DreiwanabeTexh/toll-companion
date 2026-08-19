@@ -1,27 +1,46 @@
 # Data Model & Firestore Schema Reference
 
-This document defines the Firestore collection schemas for all Phase 1 and Phase 2 features.
-All collections are **public read-only** (no auth in Phase 1 / Phase 2).
+This document defines the Firestore collection schemas for all Phase 1, Phase 2, and Phase 3 features.
+All public collections are **read-only** for clients, with `dataReports` being **write-only** for client devices.
 
 ---
 
-## 1. Collection: `tollSegments`
+## 1. Collection: `tollPlazas` (Phase 4 Exit Graph)
+Each document represents a discrete exit, entry barrier, or interchange node on an expressway.
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `id` | string | Unique plaza ID (e.g. `star_batangas`, `slex_calamba`, `nlex_bocaue`) |
+| `name` | string | Human-readable exit name (e.g. `"Batangas City Terminal"`, `"Bocaue Barrier"`) |
+| `expressway` | string | Expressway code (e.g. `STAR`, `SLEX`, `SKYWAY`, `NLEX`, `CALAX`, `CAVITEX`, `TPLEX`, `SCTEX`) |
+| `expresswayName` | string | Full name (e.g. `"STAR Tollway"`, `"South Luzon Expressway"`) |
+| `operator` | string | Operator tag (`"autosweep"` or `"easytrip"`) |
+| `orderIndex` | number | Position/sequence index along the expressway line |
+| `isInterchange` | boolean | True if this plaza connects to another expressway |
+| `connectsTo` | array\<string\> | List of connecting interchange plaza IDs |
+| `isActive` | boolean | Active status |
+| `code` | string? | Optional plaza code / abbreviation |
+
+---
+
+## 2. Collection: `tollSegments`
 Each document represents a single entry-to-exit toll segment on one expressway.
 
 | Field | Type | Description |
 |:---|:---|:---|
-| `id` | string | e.g. `star_batangas_lipa` |
+| `id` | string | e.g. `seg_star_batangas_lipa` |
 | `expressway` | string | `STAR`, `SLEX`, `SKYWAY`, `NLEX`, `TPLEX`, `CAVITEX`, `CALAX`, etc. |
 | `expresswayName` | string | `"STAR Tollway"`, `"South Luzon Expressway"` |
 | `operator` | string | `"autosweep"` or `"easytrip"` |
-| `entryPoint` | string | Entry toll plaza name |
-| `exitPoint` | string | Exit toll plaza name |
+| `entryPoint` | string | Entry toll plaza ID / name |
+| `exitPoint` | string | Exit toll plaza ID / name |
 | `fareClass1` | number | Class 1 fare (PHP) |
 | `fareClass2` | number | Class 2 fare (PHP) |
 | `fareClass3` | number | Class 3 fare (PHP) |
 | `direction` | string | `"northbound"`, `"southbound"`, or `"both"` |
 | `isActive` | boolean | Active status |
-| `lastUpdated` | timestamp | Last verified date |
+| `lastUpdated` | timestamp | Last modified date |
+| `lastVerified` | timestamp? | **Nullable** trust verification date |
 
 ---
 
@@ -35,6 +54,7 @@ Pre-defined routes referencing ordered `tollSegments` document IDs.
 | `origin` | string | Starting point |
 | `destination` | string | Terminus |
 | `segmentIds` | array\<string\> | Ordered list of `tollSegments` IDs |
+| `lastVerified` | timestamp? | **Nullable** trust verification date |
 | `isActive` | boolean | Active status |
 
 ---
@@ -103,3 +123,32 @@ Route-specific briefings with lane tips, rest stops, and exit guidance.
 | `generalAdvice` | string | Summary route briefing advice |
 | `lastUpdated` | timestamp | Verification date |
 | `isActive` | boolean | Active status |
+
+---
+
+## 7. Collection: `dataReports` (Phase 3 — Write-Only Client Feedback)
+Stores driver feedback and discrepancy reports for manual administrative review. Client permissions are strictly **create-only** (read/update/delete denied).
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `id` | string | Auto-generated document ID |
+| `reportType` | string | `"emergency_contact"`, `"toll_fare"`, or `"route"` |
+| `targetId` | string | ID of the contact, route, or toll plaza |
+| `targetName` | string | Display label of the reported entity |
+| `issueDescription` | string | Free-form driver description of the discrepancy |
+| `appVersion` | string | e.g. `"1.0.0+1"` |
+| `contextData` | map | Auto-attached context (fares, phone numbers, route endpoints) |
+| `timestamp` | timestamp | Submission timestamp |
+| `status` | string | `"pending"`, `"reviewed"`, or `"resolved"` (for console admin) |
+
+---
+
+## 8. Local Device Cache Keys (`SharedPreferences`)
+
+| Key | Description |
+|:---|:---|
+| `aero_cached_emergency_contacts` | JSON stringified list of `EmergencyContact` objects |
+| `aero_cached_routes` | JSON stringified list of `RouteModel` objects |
+| `aero_cached_segments_{routeId}` | JSON stringified list of `TollSegment` objects per route |
+| `aero_cached_guide_entries` | JSON stringified list of `GuideEntry` objects |
+| `aero_cached_last_trip` | JSON map storing the last selected route, class, total fare, and breakdown |

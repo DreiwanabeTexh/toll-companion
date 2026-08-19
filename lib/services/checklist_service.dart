@@ -22,6 +22,84 @@ class ChecklistService {
         .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
+  /// Default checklist items for offline fallback and initial seeding.
+  static const List<ChecklistItem> defaultChecklistItems = [
+    ChecklistItem(
+      id: 'check_autosweep_rfid',
+      title: 'Autosweep RFID Balance',
+      description:
+          'Confirm sufficient balance for STAR, SLEX, Skyway, TPLEX, or NAIAX sectors.',
+      category: 'rfid',
+      operator: 'autosweep',
+      sortOrder: 1,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_easytrip_rfid',
+      title: 'Easytrip RFID Balance',
+      description:
+          'Confirm sufficient balance for NLEX, SCTEX, CAVITEX, CALAX, C5 Link, or CCLEX.',
+      category: 'rfid',
+      operator: 'easytrip',
+      sortOrder: 2,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_tires_pressure',
+      title: 'Tire Pressure & Spare Tire',
+      description:
+          'Check PSI on all 4 road tires and ensure spare tire is properly inflated with a working tire wrench.',
+      category: 'vehicle',
+      sortOrder: 3,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_engine_fluids',
+      title: 'Engine Fluids & Brakes',
+      description:
+          'Verify engine oil, coolant/radiator reservoir, brake fluid, and windshield washer fluid levels.',
+      category: 'vehicle',
+      sortOrder: 4,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_fuel_battery',
+      title: 'Fuel Level / Battery Range',
+      description:
+          'Ensure at least 50% tank or adequate EV charge to avoid running out in express lanes with spaced service plazas.',
+      category: 'vehicle',
+      sortOrder: 5,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_physical_documents',
+      title: 'Driver\'s License & Vehicle OR/CR',
+      description:
+          'Carry physical original/certified copies of Driver\'s License and valid Vehicle Registration (OR/CR).',
+      category: 'documents',
+      sortOrder: 6,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_phone_powerbank',
+      title: 'Mobile Phone & Power Bank',
+      description:
+          'Fully charge driver navigation device and keep a functional USB car charger or backup battery pack.',
+      category: 'emergency',
+      sortOrder: 7,
+      isActive: true,
+    ),
+    ChecklistItem(
+      id: 'check_ewd_tools',
+      title: 'Early Warning Device (EWD) & Jack',
+      description:
+          'Verify presence of mandatory reflective triangular Early Warning Device, working jack, and flashlight.',
+      category: 'emergency',
+      sortOrder: 8,
+      isActive: true,
+    ),
+  ];
+
   /// Seeds general-purpose pre-trip checklist items if collection is empty.
   ///
   /// TODO(data): All items below are generic trip preparation placeholders.
@@ -32,85 +110,7 @@ class ChecklistService {
       return; // Already seeded
     }
 
-    // TODO(data): Generic pre-trip items covering RFID, vehicle, documents, and emergency
-    final sampleItems = [
-      const ChecklistItem(
-        id: 'check_autosweep_rfid',
-        title: 'Autosweep RFID Balance',
-        description:
-            'Confirm sufficient balance for STAR, SLEX, Skyway, TPLEX, or NAIAX sectors.',
-        category: 'rfid',
-        operator: 'autosweep',
-        sortOrder: 1,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_easytrip_rfid',
-        title: 'Easytrip RFID Balance',
-        description:
-            'Confirm sufficient balance for NLEX, SCTEX, CAVITEX, CALAX, C5 Link, or CCLEX.',
-        category: 'rfid',
-        operator: 'easytrip',
-        sortOrder: 2,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_tires_pressure',
-        title: 'Tire Pressure & Spare Tire',
-        description:
-            'Check PSI on all 4 road tires and ensure spare tire is properly inflated with a working tire wrench.',
-        category: 'vehicle',
-        sortOrder: 3,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_engine_fluids',
-        title: 'Engine Fluids & Brakes',
-        description:
-            'Verify engine oil, coolant/radiator reservoir, brake fluid, and windshield washer fluid levels.',
-        category: 'vehicle',
-        sortOrder: 4,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_fuel_battery',
-        title: 'Fuel Level / Battery Range',
-        description:
-            'Ensure at least 50% tank or adequate EV charge to avoid running out in express lanes with spaced service plazas.',
-        category: 'vehicle',
-        sortOrder: 5,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_physical_documents',
-        title: 'Driver\'s License & Vehicle OR/CR',
-        description:
-            'Carry physical original/certified copies of Driver\'s License and valid Vehicle Registration (OR/CR).',
-        category: 'documents',
-        sortOrder: 6,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_phone_powerbank',
-        title: 'Mobile Phone & Power Bank',
-        description:
-            'Fully charge driver navigation device and keep a functional USB car charger or backup battery pack.',
-        category: 'emergency',
-        sortOrder: 7,
-        isActive: true,
-      ),
-      const ChecklistItem(
-        id: 'check_ewd_tools',
-        title: 'Early Warning Device (EWD) & Jack',
-        description:
-            'Verify presence of mandatory reflective triangular Early Warning Device, working jack, and flashlight.',
-        category: 'emergency',
-        sortOrder: 8,
-        isActive: true,
-      ),
-    ];
-
-    for (final item in sampleItems) {
+    for (final item in defaultChecklistItems) {
       await _firestoreService.checklistItemsRef.doc(item.id).set(item);
     }
   }

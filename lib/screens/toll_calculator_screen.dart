@@ -1,18 +1,43 @@
 import 'package:flutter/material.dart';
-import '../models/route_model.dart';
+import '../models/toll_plaza.dart';
 import '../models/toll_segment.dart';
 import '../models/route_result.dart';
+import '../models/fuel_estimate.dart';
+import '../models/recent_trip.dart';
 import '../services/toll_service.dart';
+import '../services/cache_service.dart';
+import '../theme.dart';
+import '../widgets/aero_animations.dart';
+import '../widgets/aero_mascot.dart';
+import '../widgets/plaza_picker_sheet.dart';
+import '../widgets/report_dialog.dart';
 
-/// Toll Calculator Screen for Phase 1 and Phase 2.
+/// Aero Toll Calculator Screen powered by the Exit-to-Exit Toll Routing Engine.
 ///
-/// Allows drivers to select a route and vehicle class, displays
-/// exact fare breakdowns partitioned by RFID operator, and provides
-/// quick launches to Pre-Trip Checklist and Route Briefing.
+/// Features:
+/// - Search-based Origin & Destination Exit Picker across all Philippine expressways
+/// - Multi-segment pathfinding with automatic operator boundary detection (Autosweep vs Easytrip)
+/// - Regulatory Class 1, 2, 3 vehicle selectors with instant fare recalculation
+/// - Total Trip Cost Calculator (Expressway Tolls + Fuel Cost Estimator)
+/// - Strict sum-of-subtotals operator breakdown and trust-first verification indicators
+/// - Reversible origin/destination swap and deep links to Checklist and Route Briefings
 class TollCalculatorScreen extends StatefulWidget {
   final TollService? tollService;
+  final CacheService? cacheService;
+  final bool isTab;
+  final String? initialOriginPlazaId;
+  final String? initialDestinationPlazaId;
+  final int? initialVehicleClass;
 
-  const TollCalculatorScreen({super.key, this.tollService});
+  const TollCalculatorScreen({
+    super.key,
+    this.tollService,
+    this.cacheService,
+    this.isTab = false,
+    this.initialOriginPlazaId,
+    this.initialDestinationPlazaId,
+    this.initialVehicleClass,
+  });
 
   @override
   State<TollCalculatorScreen> createState() => _TollCalculatorScreenState();
@@ -20,195 +45,287 @@ class TollCalculatorScreen extends StatefulWidget {
 
 class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
   late final TollService _tollService;
-  RouteModel? _selectedRoute;
-  int _selectedVehicleClass = 1; // Default to Class 1 (Cars, SUVs)
-  List<TollSegment> _currentSegments = [];
-  bool _isLoadingSegments = false;
-  String? _errorMessage;
+  late final CacheService _cacheService;
+  late final Stream<List<TollPlaza>> _plazasStream;
+  List<TollPlaza>? _initialPlazas;
+
+  TollPlaza? _originPlaza;
+  TollPlaza? _destinationPlaza;
+  int _selectedVehicleClass = 1;
+
+  RouteResult? _routeResult;
+  bool _isCalculating = false;
+  String? _routingError;
+  double? _userAutosweepBalance;
+  double? _userEasytripBalance;
+
+  // Fuel Estimator State
+  bool _fuelEstimatorEnabled = true;
+  VehicleProfile _selectedVehicleProfile = VehicleProfile.custom;
+  double _customFuelPrice = FuelDefaults.defaultPricePerLiter;
+  double _customFuelEfficiency = FuelDefaults.defaultEfficiencyKmL;
+  bool _isFuelSettingsExpanded = false;
+  late final TextEditingController _fuelPriceController;
+  late final TextEditingController _fuelEfficiencyController;
 
   @override
   void initState() {
     super.initState();
     _tollService = widget.tollService ?? TollService();
+    _cacheService = widget.cacheService ?? CacheService();
+    _plazasStream = _tollService.getActivePlazas();
+    _initialPlazas = TollService.defaultPlazas;
+    if (widget.initialVehicleClass != null) {
+      _selectedVehicleClass = widget.initialVehicleClass!;
+    }
+    _fuelPriceController =
+        TextEditingController(text: _customFuelPrice.toStringAsFixed(2));
+    _fuelEfficiencyController =
+        TextEditingController(text: _customFuelEfficiency.toStringAsFixed(1));
+    _loadUserBalances();
+    _loadFuelPreferences();
+    _initializeDefaultRoute();
   }
 
-  Future<void> _onRouteSelected(RouteModel? route) async {
-    if (route == null) {
-      setState(() {
-        _selectedRoute = null;
-        _currentSegments = [];
-        _errorMessage = null;
-      });
-      return;
-    }
+  @override
+  void dispose() {
+    _fuelPriceController.dispose();
+    _fuelEfficiencyController.dispose();
+    super.dispose();
+  }
 
-    setState(() {
-      _selectedRoute = route;
-      _isLoadingSegments = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadFuelPreferences() async {
+    final prefs = await _cacheService.getFuelPreferences();
+    if (mounted) {
+      setState(() {
+        _fuelEstimatorEnabled = prefs['isEnabled'] as bool? ?? true;
+        _customFuelPrice =
+            prefs['fuelPrice'] as double? ?? FuelDefaults.defaultPricePerLiter;
+        _customFuelEfficiency = prefs['fuelEfficiency'] as double? ??
+            FuelDefaults.defaultEfficiencyKmL;
+        _selectedVehicleProfile =
+            VehicleProfile.fromString(prefs['vehicleProfile'] as String?);
+        _fuelPriceController.text = _customFuelPrice.toStringAsFixed(2);
+        _fuelEfficiencyController.text =
+            _customFuelEfficiency.toStringAsFixed(1);
+      });
+    }
+  }
+
+  void _saveFuelPreferences() {
+    _cacheService.saveFuelPreferences(
+      fuelPrice: _customFuelPrice,
+      fuelEfficiency: _customFuelEfficiency,
+      vehicleProfile: _selectedVehicleProfile.name,
+      isEnabled: _fuelEstimatorEnabled,
+    );
+  }
+
+  Future<void> _loadUserBalances() async {
+    final balances = await _cacheService.getRfidBalances();
+    if (mounted) {
+      setState(() {
+        _userAutosweepBalance = balances['autosweep'];
+        _userEasytripBalance = balances['easytrip'];
+      });
+    }
+  }
+
+  void _initializeDefaultRoute() {
+    if (widget.initialOriginPlazaId != null && widget.initialDestinationPlazaId != null) {
+      final origin = _initialPlazas?.firstWhere(
+        (p) => p.id == widget.initialOriginPlazaId,
+        orElse: () => _initialPlazas!.first,
+      );
+      final dest = _initialPlazas?.firstWhere(
+        (p) => p.id == widget.initialDestinationPlazaId,
+        orElse: () => _initialPlazas!.last,
+      );
+      _originPlaza = origin;
+      _destinationPlaza = dest;
+      _calculateFare();
+    } else {
+      _originPlaza = null;
+      _destinationPlaza = null;
+      _routeResult = null;
+    }
+  }
+
+  void _calculateFare() {
+    if (_originPlaza == null || _destinationPlaza == null) return;
+    _loadUserBalances();
 
     try {
-      final segments = await _tollService.getSegmentsForRoute(route);
-      if (mounted) {
-        setState(() {
-          _currentSegments = segments;
-          _isLoadingSegments = false;
-        });
+      final result = _tollService.calculateExitToExitFareSync(
+        originPlazaId: _originPlaza!.id,
+        destinationPlazaId: _destinationPlaza!.id,
+        vehicleClass: _selectedVehicleClass,
+      );
+
+      setState(() {
+        _routeResult = result;
+        _isCalculating = false;
+        if (result.segments.isEmpty && _originPlaza!.id != _destinationPlaza!.id) {
+          _routingError = 'No continuous expressway path found between these exits.';
+        } else {
+          _routingError = null;
+        }
+      });
+
+      if (result.segments.isNotEmpty) {
+        final corridors = result.segments.map((s) => s.expressway).toSet().toList();
+        final trip = RecentTrip(
+          id: '${_originPlaza!.id}_${_destinationPlaza!.id}_${DateTime.now().millisecondsSinceEpoch}',
+          originId: _originPlaza!.id,
+          originName: _originPlaza!.name,
+          destinationId: _destinationPlaza!.id,
+          destinationName: _destinationPlaza!.name,
+          vehicleClass: _selectedVehicleClass,
+          totalFare: result.totalFare,
+          corridors: corridors,
+          timestamp: DateTime.now(),
+          isFavorite: false,
+        );
+        _cacheService.addRecentTrip(trip);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Failed to load route segments: $e';
-          _isLoadingSegments = false;
-        });
-      }
+      setState(() {
+        _isCalculating = false;
+        _routingError = 'Routing calculation failed: $e';
+      });
     }
   }
 
-  void _onClassChanged(int vehicleClass) {
+  void _swapOriginDestination() {
+    if (_originPlaza == null || _destinationPlaza == null) return;
     setState(() {
-      _selectedVehicleClass = vehicleClass;
+      final temp = _originPlaza;
+      _originPlaza = _destinationPlaza;
+      _destinationPlaza = temp;
     });
+    _calculateFare();
+  }
+
+  Future<void> _pickOrigin(List<TollPlaza> plazas) async {
+    final selected = await PlazaPickerSheet.show(
+      context: context,
+      title: 'Select Origin Exit',
+      plazas: plazas,
+      selectedPlazaId: _originPlaza?.id,
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _originPlaza = selected;
+      });
+      _calculateFare();
+    }
+  }
+
+  Future<void> _pickDestination(List<TollPlaza> plazas) async {
+    final selected = await PlazaPickerSheet.show(
+      context: context,
+      title: 'Select Destination Exit',
+      plazas: plazas,
+      selectedPlazaId: _destinationPlaza?.id,
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _destinationPlaza = selected;
+      });
+      _calculateFare();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Toll Calculator'),
+      backgroundColor: AeroColors.surfaceBase,
+      appBar: const AeroTopBar(
+        phrases: AeroTopBar.travelPhrases,
       ),
-      body: StreamBuilder<List<RouteModel>>(
-        stream: _tollService.getActiveRoutes(),
+      body: StreamBuilder<List<TollPlaza>>(
+        stream: _plazasStream,
+        initialData: _initialPlazas,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Color(0xFF0088FF)),
-                  SizedBox(height: 16),
-                  Text(
-                    'Loading routes...',
-                    style: TextStyle(color: Color(0xFF8A919F)),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: Color(0xFFFF5252)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Couldn\'t load routes. Check your connection.\n${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFE3E2E2)),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () => setState(() {}),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final routes = snapshot.data ?? [];
-
-          if (routes.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.alt_route,
-                        size: 64, color: Color(0xFF8A919F)),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'No routes available yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFE3E2E2),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Firestore collection "routes" is currently empty.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF8A919F)),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        await _tollService.seedPlaceholderDataIfEmpty();
-                        if (mounted) setState(() {});
-                      },
-                      icon: const Icon(Icons.cloud_upload),
-                      label: const Text('Seed Sample Placeholder Routes'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          if (_selectedRoute == null && routes.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _selectedRoute == null) {
-                _onRouteSelected(routes.first);
-              }
-            });
-          }
-
-          final currentRoute = _selectedRoute ?? routes.first;
+          final plazas = snapshot.data ?? TollService.defaultPlazas;
 
           return ListView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
             children: [
-              // 1. Route Selector Card
-              _buildRouteSelectorCard(routes, currentRoute),
-              const SizedBox(height: 12),
+              // Hero Row: Mascot Alongside Trip Details Heading
+              const AeroHeroHeaderRow(
+                title: 'Trip Details',
+                subtitle: 'Search origin & destination exits across PH expressways',
+                mascotSize: 84,
+              ),
 
-              // 2. Vehicle Class Selector
-              _buildVehicleClassSelector(),
               const SizedBox(height: 16),
 
-              // 3. Segment Loading, Error, or Breakdown
-              if (_isLoadingSegments)
-                const Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(color: Color(0xFF0088FF)),
-                        SizedBox(height: 12),
-                        Text(
-                          'Calculating route fares...',
-                          style: TextStyle(color: Color(0xFF8A919F)),
-                        ),
-                      ],
+              // Exit-to-Exit Search & Route Selector Card
+              _buildExitPickerCard(plazas),
+
+              const SizedBox(height: 16),
+
+              // Vehicle Class Selector Chips
+              _buildVehicleClassSelector(),
+
+              const SizedBox(height: 16),
+
+              // Calculate Fare Action Button
+              _buildCalculateButton(),
+
+              const SizedBox(height: 20),
+
+              // Routing Error Notice
+              if (_routingError != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AeroColors.errorRed.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AeroColors.errorRed.withValues(alpha: 0.35),
                     ),
                   ),
-                )
-              else if (_errorMessage != null)
-                _buildErrorCard(_errorMessage!)
-              else if (_currentSegments.isEmpty)
-                _buildEmptySegmentsCard()
-              else
-                _buildFareBreakdown(currentRoute),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AeroColors.errorRed, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _routingError!,
+                          style: const TextStyle(
+                            color: AeroColors.errorRed,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Calculated Fare Breakdown View with smooth entrance
+              if (_routeResult != null && _routeResult!.segments.isNotEmpty) ...[
+                AeroFadeSlideIn(
+                  key: ValueKey<String>('${_originPlaza?.id}_${_destinationPlaza?.id}_$_selectedVehicleClass'),
+                  child: _buildFareBreakdownView(_routeResult!),
+                ),
+              ] else if (_originPlaza?.id == _destinationPlaza?.id && _originPlaza != null) ...[
+                _buildSameExitNotice(),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Secondary Quick Action Links
+              _buildSecondaryLinks(),
+
+              const SizedBox(height: 24),
             ],
           );
         },
@@ -216,626 +333,1557 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     );
   }
 
-  Widget _buildRouteSelectorCard(
-      List<RouteModel> routes, RouteModel currentRoute) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
+  // ===========================================================================
+  // WIDGET BUILDERS
+  // ===========================================================================
+
+  Widget _buildExitPickerCard(List<TollPlaza> plazas) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AeroColors.border),
+        boxShadow: AeroGlow.subtleCardGlow,
+      ),
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          // Origin Picker Row
+          AeroBouncyTap(
+            scaleDown: 0.98,
+            onTap: () => _pickOrigin(plazas),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: AeroColors.successEmerald,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'ORIGIN EXIT',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AeroColors.textSecondary,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _originPlaza != null
+                              ? '${_originPlaza!.name} (${_originPlaza!.expressway})'
+                              : 'Tap to select origin exit...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _originPlaza != null
+                                ? Colors.white
+                                : AeroColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.search, size: 20, color: AeroColors.neonBlue),
+                ],
+              ),
+            ),
+          ),
+
+          // Connector & Swap Button Row
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            child: Row(
               children: [
-                Icon(Icons.route, color: Color(0xFF0088FF), size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'SELECT ROUTE',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8A919F),
-                    letterSpacing: 0.5,
+                const SizedBox(width: 18),
+                Container(
+                  width: 2,
+                  height: 24,
+                  color: AeroColors.border,
+                ),
+                const Spacer(),
+                AeroBouncyTap(
+                  scaleDown: 0.90,
+                  onTap: _swapOriginDestination,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AeroColors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(color: AeroColors.border),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.swap_vert, size: 16, color: AeroColors.neonBlue),
+                        SizedBox(width: 4),
+                        Text(
+                          'Swap',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AeroColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+          ),
+
+          // Destination Picker Row
+          AeroBouncyTap(
+            scaleDown: 0.98,
+            onTap: () => _pickDestination(plazas),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: AeroColors.errorRed,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'DESTINATION EXIT',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AeroColors.textSecondary,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _destinationPlaza != null
+                              ? '${_destinationPlaza!.name} (${_destinationPlaza!.expressway})'
+                              : 'Tap to select destination exit...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _destinationPlaza != null
+                                ? Colors.white
+                                : AeroColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.search, size: 20, color: AeroColors.neonBlue),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleClassSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'VEHICLE CLASSIFICATION',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: AeroColors.textSecondary,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildClassChip(1, 'Class 1', 'Cars, SUVs, 4x4, Vans'),
+            const SizedBox(width: 8),
+            _buildClassChip(2, 'Class 2', 'Buses, Light Trucks'),
+            const SizedBox(width: 8),
+            _buildClassChip(3, 'Class 3', 'Heavy Multi-Axle Trucks'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClassChip(int classNum, String title, String subtitle) {
+    final isSelected = _selectedVehicleClass == classNum;
+
+    return Expanded(
+      child: AeroBouncyTap(
+        scaleDown: 0.94,
+        onTap: () {
+          setState(() {
+            _selectedVehicleClass = classNum;
+          });
+          _calculateFare();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AeroColors.neonBlue.withValues(alpha: 0.15)
+                : AeroColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? AeroColors.neonBlue : AeroColors.border,
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? AeroColors.neonBlue : AeroColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                classNum == 1 ? 'Cars / SUVs' : classNum == 2 ? 'Buses / Trucks' : 'Heavy Trucks',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: isSelected ? AeroColors.primaryTint : AeroColors.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalculateButton() {
+    return AeroBouncyTap(
+      scaleDown: 0.97,
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton.icon(
+          onPressed: _isCalculating ? null : _calculateFare,
+          icon: _isCalculating
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.calculate, size: 20, color: Colors.white),
+          label: Text(
+            _isCalculating ? 'ROUTING PATH...' : 'CALCULATE FARE',
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AeroColors.neonBlue,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 6,
+            shadowColor: AeroColors.neonBlue.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSameExitNotice() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AeroColors.border),
+      ),
+      child: const Center(
+        child: Text(
+          'Origin and Destination exits are identical. Fare: ₱0.00',
+          style: TextStyle(
+            color: AeroColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFareBreakdownView(RouteResult result) {
+    final fuelEstimate = result.calculateFuelEstimate(
+      vehicleProfile: _selectedVehicleProfile,
+      customPricePerLiter: _customFuelPrice,
+      customEfficiencyKmL: _customFuelEfficiency,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Total Trip Cost / Fare Hero Card
+        _buildTotalTripCostCard(result, fuelEstimate),
+
+        const SizedBox(height: 12),
+
+        // 2. Vehicle & Fuel Estimator Settings Card
+        _buildFuelSettingsCard(fuelEstimate),
+
+        const SizedBox(height: 16),
+
+        // 3. Per-Operator Subtotal Breakdown Cards
+        const Text(
+          'RFID OPERATOR BREAKDOWN',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: AeroColors.textSecondary,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        Row(
+          children: [
+            // Autosweep Subtotal Card
+            Expanded(
+              child: _buildOperatorCard(
+                operatorName: 'Autosweep RFID',
+                amount: result.fareByOperator['autosweep'] ?? 0.0,
+                segmentCount: result.segmentsByOperator['autosweep']?.length ?? 0,
+                isAutosweep: true,
+                userBalance: _userAutosweepBalance,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Easytrip Subtotal Card
+            Expanded(
+              child: _buildOperatorCard(
+                operatorName: 'Easytrip RFID',
+                amount: result.fareByOperator['easytrip'] ?? 0.0,
+                segmentCount: result.segmentsByOperator['easytrip']?.length ?? 0,
+                isAutosweep: false,
+                userBalance: _userEasytripBalance,
+              ),
+            ),
+          ],
+        ),
+
+        // Low Balance Warning Banner if wallet is short
+        if ((result.fareByOperator['autosweep'] ?? 0.0) > 0 &&
+                (_userAutosweepBalance != null &&
+                    _userAutosweepBalance! < (result.fareByOperator['autosweep'] ?? 0.0)) ||
+            (result.fareByOperator['easytrip'] ?? 0.0) > 0 &&
+                (_userEasytripBalance != null &&
+                    _userEasytripBalance! < (result.fareByOperator['easytrip'] ?? 0.0))) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AeroColors.warningAmber.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AeroColors.warningAmber.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 20, color: AeroColors.warningAmber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'LOW RFID BALANCE WARNING',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AeroColors.warningAmber,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        (result.fareByOperator['autosweep'] ?? 0.0) > 0 &&
+                                (_userAutosweepBalance != null &&
+                                    _userAutosweepBalance! <
+                                        (result.fareByOperator['autosweep'] ?? 0.0)) &&
+                                (result.fareByOperator['easytrip'] ?? 0.0) > 0 &&
+                                (_userEasytripBalance != null &&
+                                    _userEasytripBalance! <
+                                        (result.fareByOperator['easytrip'] ?? 0.0))
+                            ? 'Both Autosweep (₱${_userAutosweepBalance?.toStringAsFixed(2)}) and Easytrip (₱${_userEasytripBalance?.toStringAsFixed(2)}) balances are below estimated tolls. Top up before entry!'
+                            : (result.fareByOperator['autosweep'] ?? 0.0) > 0 &&
+                                    (_userAutosweepBalance != null &&
+                                        _userAutosweepBalance! <
+                                            (result.fareByOperator['autosweep'] ?? 0.0))
+                                ? 'Autosweep balance (₱${_userAutosweepBalance?.toStringAsFixed(2)}) is less than required toll (₱${(result.fareByOperator['autosweep'] ?? 0.0).toStringAsFixed(2)}). Top up before entering!'
+                                : 'Easytrip balance (₱${_userEasytripBalance?.toStringAsFixed(2)}) is less than required toll (₱${(result.fareByOperator['easytrip'] ?? 0.0).toStringAsFixed(2)}). Top up before entering!',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFF141414),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: currentRoute.id,
-                  isExpanded: true,
-                  dropdownColor: const Color(0xFF1A1A1A),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFE3E2E2),
+          ),
+        ],
+
+        const SizedBox(height: 16),
+
+        // 4. Traversed Segments Accordion List
+        _buildSegmentsList(result.segments),
+
+        const SizedBox(height: 16),
+
+        // 5. Aero Pro-Tip Banner
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AeroColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AeroColors.border),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lightbulb_outline, size: 20, color: AeroColors.neonBlue),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Aero recalculates toll rates dynamically based on entry/exit gantries across all operators.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AeroColors.textSecondary,
+                    height: 1.35,
                   ),
-                  icon: const Icon(Icons.keyboard_arrow_down,
-                      color: Color(0xFF0088FF)),
-                  items: routes.map((r) {
-                    return DropdownMenuItem<String>(
-                      value: r.id,
-                      child: Text(
-                        r.name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (routeId) {
-                    if (routeId != null) {
-                      final selected = routes.firstWhere((r) => r.id == routeId);
-                      _onRouteSelected(selected);
-                    }
-                  },
                 ),
               ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 6. Report Discrepancy Button
+        Align(
+          alignment: Alignment.centerRight,
+          child: InkWell(
+            onTap: () => ReportDialog.show(
+              context,
+              reportType: 'toll_fare',
+              targetId: '${_originPlaza?.id}_to_${_destinationPlaza?.id}',
+              targetName: '${_originPlaza?.name} → ${_destinationPlaza?.name}',
+              contextData: {
+                'origin': _originPlaza?.name,
+                'destination': _destinationPlaza?.name,
+                'vehicleClass': _selectedVehicleClass,
+                'totalFare': result.totalFare,
+                'fareByOperator': result.fareByOperator,
+              },
             ),
-            const SizedBox(height: 8),
+            borderRadius: BorderRadius.circular(6),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.flag_outlined, size: 13, color: AeroColors.textSecondary),
+                  SizedBox(width: 4),
+                  Text(
+                    'Report fare discrepancy',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AeroColors.textSecondary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTotalTripCostCard(
+      RouteResult result, FuelEstimate fuelEstimate) {
+    final traversedExpressways =
+        result.segments.map((s) => s.expressway).toSet().toList();
+
+    final displayedCost = _fuelEstimatorEnabled
+        ? fuelEstimate.totalTripCost
+        : result.totalFare;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AeroColors.border),
+        boxShadow: AeroGlow.subtleCardGlow,
+      ),
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Title & Verification Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _fuelEstimatorEnabled
+                    ? 'TOTAL ESTIMATED TRIP COST'
+                    : 'ESTIMATED TOLL FARE',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AeroColors.textSecondary,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              _buildVerificationBadge(result),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // Total Trip Cost Big Display
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '₱${displayedCost.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
+                  color: _fuelEstimatorEnabled
+                      ? AeroColors.neonBlue
+                      : AeroColors.primaryTint,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              if (_fuelEstimatorEnabled) ...[
+                const SizedBox(width: 8),
+                const Text(
+                  '(Toll + Fuel)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AeroColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // 3-Metric Itemized Breakdown Bar
+          if (_fuelEstimatorEnabled) ...[
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      // Toll Fare Item
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.toll_outlined,
+                                    size: 13, color: AeroColors.neonBlue),
+                                SizedBox(width: 4),
+                                Text(
+                                  'TOLL FARE',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AeroColors.textSecondary,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '₱${result.totalFare.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 28,
+                        color: AeroColors.border,
+                      ),
+                      // Fuel Cost Item
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.local_gas_station_outlined,
+                                      size: 13,
+                                      color: AeroColors.secondaryOrange),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'EST. FUEL',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AeroColors.textSecondary,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '₱${fuelEstimate.estimatedFuelCost.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 28,
+                        color: AeroColors.border,
+                      ),
+                      // Distance Item
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.route_outlined,
+                                      size: 13,
+                                      color: AeroColors.emeraldGreen),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'DISTANCE',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AeroColors.textSecondary,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '~${result.totalDistanceKm.toStringAsFixed(0)} km',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Visual Cost Proportion Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      height: 6,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: (fuelEstimate.tollSharePercentage * 10)
+                                .round()
+                                .clamp(1, 1000),
+                            child: Container(color: AeroColors.neonBlue),
+                          ),
+                          const SizedBox(width: 2),
+                          Expanded(
+                            flex: (fuelEstimate.fuelSharePercentage * 10)
+                                .round()
+                                .clamp(1, 1000),
+                            child: Container(color: AeroColors.secondaryOrange),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Toll: ${fuelEstimate.tollSharePercentage.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AeroColors.neonBlue,
+                        ),
+                      ),
+                      Text(
+                        'Fuel: ${fuelEstimate.fuelSharePercentage.toStringAsFixed(0)}% (~${fuelEstimate.litersNeeded.toStringAsFixed(1)}L)',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AeroColors.secondaryOrange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Route Corridor Breadcrumb Chips
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (int i = 0; i < traversedExpressways.length; i++) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AeroColors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AeroColors.border),
+                  ),
+                  child: Text(
+                    traversedExpressways[i],
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                if (i < traversedExpressways.length - 1)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Icon(Icons.arrow_forward,
+                        size: 12, color: AeroColors.textSecondary),
+                  ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFuelSettingsCard(FuelEstimate fuelEstimate) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AeroColors.border),
+      ),
+      child: Column(
+        children: [
+          // Header Bar (Expandable + Toggle)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _isFuelSettingsExpanded = !_isFuelSettingsExpanded;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AeroColors.secondaryOrange
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.local_gas_station,
+                              size: 18,
+                              color: AeroColors.secondaryOrange,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Gas & Fuel Estimator',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_customFuelEfficiency.toStringAsFixed(1)} km/L • ₱${_customFuelPrice.toStringAsFixed(2)}/L',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AeroColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            _isFuelSettingsExpanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
+                            size: 22,
+                            color: AeroColors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.85,
+                  child: Switch(
+                    value: _fuelEstimatorEnabled,
+                    activeColor: AeroColors.secondaryOrange,
+                    onChanged: (val) {
+                      setState(() {
+                        _fuelEstimatorEnabled = val;
+                      });
+                      _saveFuelPreferences();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Expanded Content Area
+          if (_isFuelSettingsExpanded) ...[
+            const Divider(height: 1, color: AeroColors.border),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Quick Presets
+                  const Text(
+                    'CAR TYPE (AUTO-FILLS KM/L)',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: AeroColors.textSecondary,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildSimplePresetButton(
+                        label: 'Sedan (14 km/L)',
+                        icon: Icons.directions_car,
+                        profile: VehicleProfile.sedan,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildSimplePresetButton(
+                        label: 'SUV (10 km/L)',
+                        icon: Icons.airport_shuttle,
+                        profile: VehicleProfile.suv,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildSimplePresetButton(
+                        label: 'Van/Pickup (8 km/L)',
+                        icon: Icons.local_shipping,
+                        profile: VehicleProfile.pickup,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 2. Direct Manual Input Numbers
+                  const Text(
+                    'MANUAL INPUTS (EDIT ANYTIME)',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: AeroColors.textSecondary,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      // Efficiency Input (km/L)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'KM / LITER',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AeroColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _fuelEfficiencyController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                              decoration: InputDecoration(
+                                suffixText: ' km/L',
+                                suffixStyle: const TextStyle(
+                                  color: AeroColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                filled: true,
+                                fillColor: AeroColors.surfaceContainerLow,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: AeroColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: AeroColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: AeroColors.secondaryOrange,
+                                      width: 1.5),
+                                ),
+                              ),
+                              onChanged: (val) {
+                                final parsed = double.tryParse(val);
+                                if (parsed != null && parsed > 0) {
+                                  setState(() {
+                                    _customFuelEfficiency = parsed;
+                                    _selectedVehicleProfile =
+                                        VehicleProfile.custom;
+                                  });
+                                  _saveFuelPreferences();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Fuel Price Input (₱/L)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'GAS PRICE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AeroColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _fuelPriceController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: '₱ ',
+                                prefixStyle: const TextStyle(
+                                  color: AeroColors.secondaryOrange,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                                suffixText: ' /L',
+                                suffixStyle: const TextStyle(
+                                  color: AeroColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                filled: true,
+                                fillColor: AeroColors.surfaceContainerLow,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: AeroColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: AeroColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: AeroColors.secondaryOrange,
+                                      width: 1.5),
+                                ),
+                              ),
+                              onChanged: (val) {
+                                final parsed = double.tryParse(val);
+                                if (parsed != null && parsed > 0) {
+                                  setState(() {
+                                    _customFuelPrice = parsed;
+                                  });
+                                  _saveFuelPreferences();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Friendly Helper Note
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          size: 13, color: AeroColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Type your car\'s dashboard km/L and current gas pump price.',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AeroColors.textSecondary.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimplePresetButton({
+    required String label,
+    required IconData icon,
+    required VehicleProfile profile,
+  }) {
+    final isSelected = _selectedVehicleProfile == profile;
+
+    return Expanded(
+      child: AeroBouncyTap(
+        scaleDown: 0.94,
+        onTap: () {
+          setState(() {
+            _selectedVehicleProfile = profile;
+            _fuelEstimatorEnabled = true;
+            _customFuelEfficiency = profile.defaultEfficiencyKmL;
+            _fuelEfficiencyController.text =
+                _customFuelEfficiency.toStringAsFixed(1);
+          });
+          _saveFuelPreferences();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AeroColors.secondaryOrange.withValues(alpha: 0.15)
+                : AeroColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? AeroColors.secondaryOrange
+                  : AeroColors.border,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected
+                    ? AeroColors.secondaryOrange
+                    : AeroColors.textSecondary,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label.split('(').first.trim(),
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected
+                      ? AeroColors.secondaryOrange
+                      : Colors.white,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                '${profile.defaultEfficiencyKmL.toStringAsFixed(0)} km/L',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? AeroColors.secondaryOrange.withValues(alpha: 0.9)
+                      : AeroColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOperatorCard({
+    required String operatorName,
+    required double amount,
+    required int segmentCount,
+    required bool isAutosweep,
+    double? userBalance,
+  }) {
+    final isShort = amount > 0 && userBalance != null && userBalance < amount;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isShort
+              ? AeroColors.warningAmber.withValues(alpha: 0.6)
+              : amount > 0
+                  ? (isAutosweep
+                      ? AeroColors.successEmerald.withValues(alpha: 0.35)
+                      : AeroColors.neonBlue.withValues(alpha: 0.35))
+                  : AeroColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: isAutosweep
+                      ? AeroColors.successEmerald
+                      : AeroColors.neonBlue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  operatorName,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '₱${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: amount > 0
+                  ? (isAutosweep ? AeroColors.successEmerald : AeroColors.neonBlue)
+                  : AeroColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            segmentCount == 1 ? '1 segment' : '$segmentCount segments',
+            style: const TextStyle(
+              fontSize: 10,
+              color: AeroColors.textSecondary,
+            ),
+          ),
+          if (userBalance != null && amount > 0) ...[
+            const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.trip_origin, size: 14, color: Color(0xFF00CC88)),
+                Icon(
+                  isShort ? Icons.error_outline : Icons.check_circle_outline,
+                  size: 11,
+                  color: isShort ? AeroColors.warningAmber : AeroColors.successEmerald,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    '${currentRoute.origin} → ${currentRoute.destination}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF8A919F)),
+                    isShort
+                        ? 'Wallet: ₱${userBalance.toStringAsFixed(0)} (Short)'
+                        : 'Wallet: ₱${userBalance.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: isShort ? AeroColors.warningAmber : AeroColors.successEmerald,
+                    ),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildVehicleClassSelector() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.directions_car, color: Color(0xFF0088FF), size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'VEHICLE CLASS',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8A919F),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<int>(
-              segments: const [
-                ButtonSegment<int>(
-                  value: 1,
-                  label: Text('Class 1'),
-                  icon: Icon(Icons.directions_car, size: 16),
-                ),
-                ButtonSegment<int>(
-                  value: 2,
-                  label: Text('Class 2'),
-                  icon: Icon(Icons.directions_bus, size: 16),
-                ),
-                ButtonSegment<int>(
-                  value: 3,
-                  label: Text('Class 3'),
-                  icon: Icon(Icons.local_shipping, size: 16),
-                ),
-              ],
-              selected: {_selectedVehicleClass},
-              onSelectionChanged: (newSelection) {
-                _onClassChanged(newSelection.first);
-              },
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return const Color(0xFF0088FF).withValues(alpha: 0.2);
-                  }
-                  return const Color(0xFF141414);
-                }),
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return const Color(0xFF0088FF);
-                  }
-                  return const Color(0xFF8A919F);
-                }),
-                side: WidgetStateProperty.all(
-                  const BorderSide(color: Color(0xFF2A2A2A)),
-                ),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _selectedVehicleClass == 1
-                  ? 'Class 1: Cars, SUVs, Pickups, Vans'
-                  : _selectedVehicleClass == 2
-                      ? 'Class 2: Buses, Medium Trucks'
-                      : 'Class 3: Heavy Trucks, Multi-axle trailers',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF8A919F)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  bool _isSegmentsExpanded = false;
 
-  Widget _buildFareBreakdown(RouteModel route) {
-    final result = _tollService.calculateFare(
-      segments: _currentSegments,
-      vehicleClass: _selectedVehicleClass,
-    );
-
-    final autosweepSegments = result.segmentsByOperator['autosweep'] ?? [];
-    final easytripSegments = result.segmentsByOperator['easytrip'] ?? [];
-    final otherOperators = result.segmentsByOperator.keys
-        .where((op) => op != 'autosweep' && op != 'easytrip')
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Route Trip Summary Banner
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Text(
-            'Fare Breakdown: ${route.name}',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFFE3E2E2),
-            ),
-          ),
-        ),
-
-        // 1. Autosweep Operator Card
-        if (autosweepSegments.isNotEmpty) ...[
-          _buildOperatorCard(
-            operatorTitle: 'Autosweep Roads',
-            operatorCode: 'autosweep',
-            accentColor: const Color(0xFFFFA000), // Amber
-            badgeColor: const Color(0xFF332200),
-            segments: autosweepSegments,
-            subtotal: result.fareByOperator['autosweep'] ?? 0.0,
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // 2. Easytrip Operator Card
-        if (easytripSegments.isNotEmpty) ...[
-          _buildOperatorCard(
-            operatorTitle: 'Easytrip Roads',
-            operatorCode: 'easytrip',
-            accentColor: const Color(0xFF0088FF), // Electric Blue
-            badgeColor: const Color(0xFF002244),
-            segments: easytripSegments,
-            subtotal: result.fareByOperator['easytrip'] ?? 0.0,
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // 3. Other operators if any
-        for (final op in otherOperators) ...[
-          _buildOperatorCard(
-            operatorTitle: '${op.toUpperCase()} Roads',
-            operatorCode: op,
-            accentColor: const Color(0xFF00CC88),
-            badgeColor: const Color(0xFF003322),
-            segments: result.segmentsByOperator[op] ?? [],
-            subtotal: result.fareByOperator[op] ?? 0.0,
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // 4. Combined Total & RFID Top-Up Callout Card
-        _buildTotalCard(result),
-
-        const SizedBox(height: 14),
-
-        // Phase 2 Companion Actions: Checklist & Route Briefing
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/checklist',
-                    arguments: route,
-                  );
-                },
-                icon: const Icon(Icons.checklist_rtl,
-                    size: 18, color: Color(0xFF00CC88)),
-                label: const Text(
-                  'Checklist',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFE3E2E2),
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF2A2A2A)),
-                  backgroundColor: const Color(0xFF141414),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/route-briefing',
-                    arguments: route,
-                  );
-                },
-                icon: const Icon(Icons.alt_route,
-                    size: 18, color: Color(0xFF0088FF)),
-                label: const Text(
-                  'Briefing',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFE3E2E2),
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF2A2A2A)),
-                  backgroundColor: const Color(0xFF141414),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 12),
-
-        // 5. Data freshness & placeholder disclaimer
-        _buildDataFreshnessNotice(result),
-      ],
-    );
-  }
-
-  Widget _buildOperatorCard({
-    required String operatorTitle,
-    required String operatorCode,
-    required Color accentColor,
-    required Color badgeColor,
-    required List<TollSegment> segments,
-    required double subtotal,
-  }) {
-    return Card(
-      shape: RoundedRectangleBorder(
+  Widget _buildSegmentsList(List<TollSegment> segments) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: accentColor.withValues(alpha: 0.3), width: 1),
+        border: Border.all(color: AeroColors.border),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Operator Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(11),
-                topRight: Radius.circular(11),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: accentColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      operatorTitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: accentColor.withValues(alpha: 0.4),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isSegmentsExpanded = !_isSegmentsExpanded;
+              });
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Traversed Segments (${segments.length})',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Tap to view individual toll gantry rates',
+                          style: TextStyle(fontSize: 11, color: AeroColors.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Text(
-                    operatorCode.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: accentColor,
-                    ),
+                  Icon(
+                    _isSegmentsExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: _isSegmentsExpanded ? AeroColors.neonBlue : AeroColors.textSecondary,
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Segments List
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              children: [
-                for (int i = 0; i < segments.length; i++) ...[
-                  _buildSegmentRow(segments[i]),
-                  if (i < segments.length - 1)
-                    const Divider(height: 16, color: Color(0xFF2A2A2A)),
                 ],
-              ],
-            ),
-          ),
-
-          const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A2A)),
-
-          // Subtotal Row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Subtotal:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8A919F),
-                  ),
-                ),
-                Text(
-                  '₱${subtotal.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: accentColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSegmentRow(TollSegment segment) {
-    final fare = _selectedVehicleClass == 2
-        ? segment.fareClass2
-        : _selectedVehicleClass == 3
-            ? segment.fareClass3
-            : segment.fareClass1;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                segment.expresswayName,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFE3E2E2),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${segment.entryPoint} → ${segment.exitPoint}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF8A919F),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          '₱${fare.toStringAsFixed(2)}',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFFE3E2E2),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTotalCard(RouteResult result) {
-    return Card(
-      color: const Color(0xFF141414),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF0088FF), width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'TOTAL TOLL FARE',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                    color: Color(0xFF8A919F),
-                  ),
-                ),
-                Text(
-                  '₱${result.totalFare.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0088FF),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(color: Color(0xFF2A2A2A), height: 20),
-            const Text(
-              'Required RFID Wallet Top-Ups:',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF8A919F),
               ),
             ),
-            const SizedBox(height: 8),
-            for (final advisory in result.topUpAdvisories)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2.0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline,
-                        size: 16, color: Color(0xFF00CC88)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        advisory,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFE3E2E2),
+          ),
+          if (_isSegmentsExpanded) ...[
+            const Divider(color: AeroColors.border, height: 1),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              itemCount: segments.length,
+              separatorBuilder: (_, _) => const Divider(
+                color: AeroColors.border,
+                height: 1,
+              ),
+              itemBuilder: (context, index) {
+                final segment = segments[index];
+                final fare = _selectedVehicleClass == 2
+                    ? segment.fareClass2
+                    : _selectedVehicleClass == 3
+                        ? segment.fareClass3
+                        : segment.fareClass1;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AeroColors.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          segment.expressway,
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: AeroColors.primaryTint,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${segment.entryPoint} → ${segment.exitPoint}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AeroColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '₱${fare.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildDataFreshnessNotice(RouteResult result) {
-    final formattedDate = result.latestVerificationDate != null
-        ? 'Verified: ${_formatMonthYear(result.latestVerificationDate!)}'
-        : 'Verified: Jan 2025';
+  Widget _buildVerificationBadge(RouteResult result) {
+    if (result.latestVerificationDate != null) {
+      final month = result.latestVerificationDate!.month.toString().padLeft(2, '0');
+      final year = (result.latestVerificationDate!.year % 100).toString().padLeft(2, '0');
 
-    return Center(
-      child: Column(
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.info_outline, size: 14, color: Color(0xFF8A919F)),
-              const SizedBox(width: 4),
-              Text(
-                'Fares $formattedDate • // TODO(data): Placeholder amounts',
-                style: const TextStyle(fontSize: 11, color: Color(0xFF8A919F)),
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AeroColors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(9999),
+          border: Border.all(color: AeroColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.verified, size: 12, color: AeroColors.neonBlue),
+            const SizedBox(width: 4),
+            Text(
+              'Fare as of $month/$year',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AeroColors.textMuted,
               ),
-            ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AeroColors.warningAmber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(
+          color: AeroColors.warningAmber.withValues(alpha: 0.4),
+        ),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 12, color: AeroColors.warningAmber),
+          SizedBox(width: 4),
+          Text(
+            'NOT YET VERIFIED',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: AeroColors.warningAmber,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorCard(String error) {
-    return Card(
-      color: const Color(0xFF2A0808),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFFF5252)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Color(0xFFFF5252)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                error,
-                style: const TextStyle(color: Color(0xFFFF5252), fontSize: 13),
+  Widget _buildSecondaryLinks() {
+    return Row(
+      children: [
+        Expanded(
+          child: AeroBouncyTap(
+            scaleDown: 0.96,
+            onTap: () => Navigator.of(context).pushNamed('/checklist'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.checklist, size: 18, color: AeroColors.neonBlue),
+                  SizedBox(width: 6),
+                  Text(
+                    'Pre-Trip Checklist',
+                    style: TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptySegmentsCard() {
-    return const Card(
-      child: Padding(
-        padding: EdgeInsets.all(24.0),
-        child: Center(
-          child: Text(
-            'No toll segments found for this route.',
-            style: TextStyle(color: Color(0xFF8A919F)),
           ),
         ),
-      ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: AeroBouncyTap(
+            scaleDown: 0.96,
+            onTap: () => Navigator.of(context).pushNamed(
+              '/route-briefing',
+              arguments: 'sample_route_multi_operator',
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.menu_book, size: 18, color: AeroColors.neonBlue),
+                  SizedBox(width: 6),
+                  Text(
+                    'Route Briefing',
+                    style: TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
-  }
-
-  String _formatMonthYear(DateTime dt) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    return '${months[dt.month - 1]} ${dt.year}';
   }
 }

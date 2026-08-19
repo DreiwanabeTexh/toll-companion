@@ -25,6 +25,7 @@ class ChecklistScreen extends StatefulWidget {
 
 class _ChecklistScreenState extends State<ChecklistScreen> {
   late final ChecklistService _checklistService;
+  late final Stream<List<ChecklistItem>> _checklistStream;
   final Set<String> _checkedItemIds = {};
   bool _isSeeding = false;
 
@@ -32,6 +33,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   void initState() {
     super.initState();
     _checklistService = widget.checklistService ?? ChecklistService();
+    _checklistStream = _checklistService.getChecklistItems();
   }
 
   void _toggleItem(String id) {
@@ -69,7 +71,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         ],
       ),
       body: StreamBuilder<List<ChecklistItem>>(
-        stream: _checklistService.getChecklistItems(),
+        stream: _checklistStream,
+        initialData: ChecklistService.defaultChecklistItems,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(

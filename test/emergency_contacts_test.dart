@@ -100,27 +100,28 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Verify Screen Title and Top Trust Banner
-      expect(find.text('Emergency Contacts'), findsOneWidget);
-      expect(find.textContaining('Tier 1 Official Hotlines Only'), findsOneWidget);
+      // Verify Screen Title and Subtitle
+      expect(find.text('Emergency'), findsOneWidget);
+      expect(find.text('Verified Highway Patrol & Assist'), findsOneWidget);
 
       // Verify Agency Cards
       expect(find.text('Toll Regulatory Board (TRB)'), findsOneWidget);
-      expect(find.text('TRB'), findsOneWidget);
       expect(find.text('All toll expressways'), findsOneWidget);
 
       expect(find.text('SMC Tollways / Autosweep'), findsOneWidget);
-      expect(find.text('AUTOSWEEP'), findsOneWidget);
+      expect(find.text('STAR, SLEX, Skyway, TPLEX, NAIAX'), findsOneWidget);
 
       // Verify Prominent Verification Badges
-      // 1. Unverified badge
-      expect(find.textContaining('Not yet verified'), findsOneWidget);
-      // 2. Verified badge
-      expect(find.text('Verified: Jan 2025'), findsOneWidget);
+      // 1. Unverified warning badge (strictly for lastVerified == null)
+      expect(find.text('NOT YET VERIFIED'), findsOneWidget);
+      // 2. Verified checkmark badge
+      expect(find.text('VERIFIED 01/25'), findsOneWidget);
 
-      // Verify Tap-to-Call Action Buttons
-      expect(find.widgetWithText(FilledButton, 'Call 000-000-0000 (UNVERIFIED)'),
-          findsNWidgets(2));
+      // Verify Call Now Action Buttons (Clean CALL NOW label)
+      expect(
+        find.text('CALL NOW'),
+        findsNWidgets(2),
+      );
     });
 
     testWidgets('Displays empty state when no contacts exist',
@@ -144,7 +145,8 @@ void main() {
     testWidgets('Displays error state when contacts stream fails',
         (WidgetTester tester) async {
       final mockService = MockContactsService(
-        contactsStreamProvider: () => Stream.error('Firestore permission denied'),
+        contactsStreamProvider:
+            () => Stream.error('Firestore permission denied'),
       );
 
       await tester.pumpWidget(

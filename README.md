@@ -1,9 +1,9 @@
-# PH Expressway Companion
+# Aero — Philippine Expressway Companion
 
-A driver's companion app for navigating Philippine expressways — built around the real pain point of multi-operator toll systems (Autosweep vs. Easytrip), for any driver planning a trip across PH expressways.
+A driver's companion app for navigating Philippine expressways — built around the real pain point of multi-operator toll systems (Autosweep vs. Easytrip), for any driver planning a trip across PH expressways. Branded as **Aero**, with a bird mascot and dark "Nocturnal Command" visual identity.
 
-> **Status:** Pre-development / Planning complete for Phase 1
-> **Note:** All fare amounts, toll plaza data, and phone numbers referenced in this project are **placeholders** pending verification against official sources. Do not ship with unverified data.
+> **Status:** Phases 0–3 complete and functionally shipped (self/informal testing). Phase 3.5 (real data verification) in progress — Tier 1 emergency contacts verified; toll fare matrix verification still pending. Phase 4 (routing engine + personalization core) in active development.
+> **Note:** Toll plaza/fare data is still largely **placeholder** pending full verification against official sources (TRB, Autosweep, Easytrip). Emergency contact hotlines for the 5 Tier 1 agencies have been verified against official sources. Do not treat any unverified data as production-accurate — check each entry's "last verified" status in-app.
 
 ---
 
@@ -34,8 +34,9 @@ A companion app that consolidates:
 | Frontend | **Flutter (Dart)** | Single codebase for Android + iOS, native performance, strong widget support for card/list-based UI |
 | Backend / Data | **Firebase (Firestore)** | Content-editable without app redeploys; pairs natively with Flutter via FlutterFire |
 | Tap-to-call | `url_launcher` package | Native `tel:` link handling |
-| Local caching (later phase) | `hive` or `shared_preferences` | Offline support for spotty expressway signal |
-| Auth | None (Phase 1) | No user accounts needed yet; all Firestore reads, no per-user writes |
+| Local caching | **`shared_preferences`** (implemented, Phase 3) | Offline support for spotty expressway signal — caches contacts, last route, guide entries; falls back automatically when Firestore reads fail |
+| Feedback/reporting | Write-only `dataReports` Firestore collection | Users can flag outdated data; no client read/update/delete access — reviewed manually via Firebase Console |
+| Auth | None yet — **tentative Phase 5** | No user accounts currently; all Firestore reads, no per-user writes. Login/sign-in is being considered as an optional future phase, not yet committed |
 
 ---
 
@@ -61,32 +62,61 @@ A companion app that consolidates:
 
 ## Features
 
-### Phase 1 — MVP (build first, ship first)
+### Phase 1 — MVP ✅ Complete
 
 | Feature | Description |
 |---|---|
 | **Toll Calculator** | Route builder + fare breakdown by RFID operator. Shows which wallet (Autosweep / Easytrip) needs topping up and by how much — never a single merged total. |
-| **Quick Guide** ("What do I do if...") | Static FAQ-style content for common on-road situations. Simple list/detail UI, content pulled from Firestore. |
+| **Quick Guide** ("What do I do if...") | Expandable category accordion, content pulled from Firestore, "Troubleshoot" / "View FAQ" actions per topic. |
 | **Emergency Contacts (Tier 1 only)** | Official hotlines only — TRB, SMC/Autosweep, MPTC/Easytrip, MMDA, PNP-HPG. Tap-to-call UX. Every entry carries a mandatory **last-verified date** shown in the UI. Crowdsourced/local listings explicitly excluded from this phase. |
 
-### Phase 2 — Companion Depth (after real trip usage)
+### Phase 2 — Companion Depth ✅ Complete
 
 | Feature | Description |
 |---|---|
-| **Pre-Trip Checklist** | Loosely tied to the route built in the Toll Calculator; eventually smart enough to suggest specific top-up amounts. |
-| **Route Briefing** | Lane tips, rest stops, and common exit confusions, tied to whatever route the user builds. Content-heavy — driven by real research across major PH expressway routes, expanded incrementally based on usage. |
+| **Pre-Trip Checklist** | Categorized readiness checklist (RFID & Toll Wallets, Vehicle Roadworthiness, Documents, Emergency Equipment) with progress tracking, tied to the active route. |
+| **Route Briefing** | Tabbed Lane Tips / Rest Stops / Exit Warnings, tied to whatever route the user builds. Expanded incrementally based on real usage. |
 
-### Phase 3 — Polish & Trust
+### Phase 2.5 — Aero Rebrand & Visual Identity ✅ Complete
+
+- Full UI/UX rebuild and rebrand to **Aero**, adopting the bird mascot and "Nocturnal Command" dark visual design system from the reference design folder
+- Persistent bottom tab navigation (Home / Tolls / Emergency / Guide)
+- Native Flutter-based mascot animation (wing-flap, breathing, banking tilt) — built with `AnimationController`, not a WebView, to keep the app fully functional offline
+- Dedicated large mascot "hero" placement on Home, Emergency, Quick Guide, and Toll Calculator
+
+### Phase 3 — Polish & Trust ✅ Complete
 
 - Visible "last verified" indicators across all contact and fare data
-- Offline caching for last-used route, checklist, and contacts
-- User feedback mechanism to flag outdated numbers or fares
+- Offline caching (`shared_preferences`) for last-used route, emergency contacts, and guide entries — with a visible "Offline — showing saved data" banner when serving cached content
+- Write-only feedback/reporting mechanism to flag outdated numbers or fares
 
-### Phase 4 — v2 Exploration
+### Phase 3.5 — Real Data Verification 🔄 In Progress
+
+- ✅ Tier 1 emergency contact hotlines verified against official sources (TRB, SMC/Autosweep, MPTC/Easytrip, MMDA, PNP-HPG)
+- ⬜ Toll fare matrix verification against official TRB/Autosweep/Easytrip sources — pending, larger scope (per-segment, per-operator, per-vehicle-class)
+
+### Phase 4 — Routing Engine & Personalization Core 🔄 In Progress
+
+| Feature | Description |
+|---|---|
+| **Free exit-to-exit routing engine** | Replaces the predefined-routes-only calculator with a searchable plaza/exit picker (origin + destination) and automatic multi-segment, multi-operator path calculation — matching how established PH toll calculator apps work, while keeping Aero's strict per-operator fare breakdown. |
+| **Manual RFID balance tracking** | User manually enters their known Autosweep/EasyTrip balance (no official balance-check API exists for third-party apps); app warns if a planned trip's fare would exceed the recorded balance. Includes a visible "balance last updated" trust indicator, same pattern as verified contacts/fares. |
+| **Recent Routes — real history** | Auto-logs every calculated trip locally (no manual save required) plus a separate manual "save as favorite" option for routes used often. |
+| **Randomized status copy** | Small pool of variant phrases for each screen's status pill (e.g. "Plan your trip.") that rotate rather than showing the same static line every time. |
+
+### Phase 5 — Accounts & Sync (Tentative / Not Yet Committed)
+
+- Login / sign-up
+- Personalized greeting (first name replacing "Hello, Driver")
+- Cross-device sync of saved routes, balance, and checklist state
+- *This phase is exploratory — "if ever" per current direction, not a committed roadmap item.*
+
+### Phase 6 — v2 Exploration
 
 - **Fuel comparison** across the route (explicitly deferred from v1 — strong v2 story, not a launch blocker)
 - Smart checklist auto-suggesting RFID top-up amounts based on the built route
 - **Tier 2 emergency contacts** — local mechanic shops per exit — only once a verification/moderation process exists
+- **Full nationwide toll plaza network data population** — real, verified plaza-to-plaza connectivity and fares across all PH expressways (the routing engine in Phase 4 ships with sample/placeholder network data; full real-data population is its own dedicated task)
 
 ---
 
@@ -122,29 +152,48 @@ A companion app that consolidates:
 ## Roadmap Overview
 
 ```
-Phase 0 — Foundation
+Phase 0 — Foundation ✅
   └─ Flutter project setup, Firebase/Firestore connection, schema design
 
-Phase 1 — Core MVP  ⬅ SHIP HERE
+Phase 1 — Core MVP ✅
   ├─ Toll Calculator (multi-operator breakdown)
   ├─ Quick Guide
   └─ Emergency Contacts (Tier 1, verified only)
 
-        ↓ Soft-launch to self / friends & family, use on real trips ↓
-
-Phase 2 — Companion Depth
+Phase 2 — Companion Depth ✅
   ├─ Pre-Trip Checklist
-  └─ Route Briefing (expanded incrementally across major PH expressway routes)
+  └─ Route Briefing
 
-Phase 3 — Polish & Trust
+Phase 2.5 — Aero Rebrand & Visual Identity ✅
+  ├─ Full UI/UX rebuild matching reference design
+  ├─ Bottom tab navigation
+  └─ Native animated mascot (offline-safe, no WebView)
+
+Phase 3 — Polish & Trust ✅
   ├─ Last-verified indicators
-  ├─ Offline caching
-  └─ Feedback / correction mechanism
+  ├─ Offline caching (shared_preferences)
+  └─ Feedback / correction mechanism (write-only reports)
 
-Phase 4 — v2
+Phase 3.5 — Real Data Verification 🔄
+  ├─ Tier 1 emergency contacts ✅ verified
+  └─ Toll fare matrix ⬜ pending
+
+Phase 4 — Routing Engine & Personalization Core ✅
+  ├─ Free exit-to-exit routing engine (graph BFS + operator boundary detection)
+  ├─ Manual RFID balance tracking + dynamic low-balance warnings
+  ├─ Recent Routes: auto-history + save favorites + tap-to-recalculate
+  └─ Offline persistence via SharedPreferences (zero-login)
+
+Phase 5 — Accounts & Sync (tentative, not committed)
+  ├─ Login / sign-up
+  ├─ Personalized greeting
+  └─ Cross-device sync
+
+Phase 6 — v2
   ├─ Fuel comparison
   ├─ Smart checklist
-  └─ Tier 2 local mechanic listings (verification process required first)
+  ├─ Tier 2 local mechanic listings (verification process required first)
+  └─ Full nationwide toll plaza network data population
 ```
 
 **Deployment path:**
@@ -154,9 +203,10 @@ Phase 4 — v2
 
 ---
 
-## Explicit Non-Goals (Phase 1)
+## Explicit Non-Goals (Current — Phase 4)
 
-- No user accounts or authentication
+- No user accounts or authentication yet — Phase 5 is tentative and not committed
 - No state management libraries or extra dependencies beyond what's listed, without discussion
 - No crowdsourced or unverified emergency contact data
-- No fuel comparison, smart suggestions, or Tier 2 features until their respective phases
+- No fuel comparison, smart suggestions, or Tier 2 features until Phase 6
+- No full real-data toll plaza network yet — Phase 4's routing engine ships with placeholder/sample network data; full verified nationwide data population is a separate, dedicated Phase 6 task

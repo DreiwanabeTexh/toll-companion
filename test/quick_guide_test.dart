@@ -91,7 +91,7 @@ void main() {
       ),
     ];
 
-    testWidgets('Renders category filter chips and list of guide cards',
+    testWidgets('Renders expandable accordion categories and Contact Support card',
         (WidgetTester tester) async {
       final mockService = MockGuideService(
         guideEntriesStreamProvider: () => Stream.value(sampleEntries),
@@ -105,26 +105,30 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Verify Screen Title
-      expect(find.text('Quick Guide'), findsOneWidget);
+      // Verify Screen Header
+      expect(find.text('Quick Guide'), findsWidgets);
 
-      // Verify Category Chips
-      expect(find.text('All Topics'), findsOneWidget);
-      expect(find.text('RFID'), findsWidgets);
-      expect(find.text('Breakdown'), findsWidgets);
-      expect(find.text('Navigation'), findsWidgets);
-      expect(find.text('Safety'), findsOneWidget);
+      // Verify Accordion Categories
+      expect(find.text('RFID & Tolls'), findsOneWidget);
+      expect(find.text('Vehicle Status & Breakdown'), findsOneWidget);
+      expect(find.text('Expressway Navigation'), findsOneWidget);
+      expect(find.text('Road Safety Protocols'), findsOneWidget);
 
-      // Verify Guide Cards
-      expect(find.text('What do I do if my RFID is not detected at the toll gantry?'),
-          findsOneWidget);
-      expect(find.text('What do I do if I get a flat tire on the expressway shoulder?'),
-          findsOneWidget);
-      expect(find.text('What do I do if I miss my planned expressway exit?'),
-          findsOneWidget);
+      // RFID category is expanded by default in Aero (shows description and action buttons)
+      expect(
+        find.text(
+            'Transponder issues, toll zone discrepancies, and account linking.'),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(ElevatedButton, 'Troubleshoot'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'View FAQ'), findsOneWidget);
+
+      // Verify Contact Support Card
+      expect(find.text('Need human assistance?'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Contact Support'), findsOneWidget);
     });
 
-    testWidgets('Category filter chip filters guide entries list',
+    testWidgets('Tapping accordion header toggles category expand/collapse',
         (WidgetTester tester) async {
       final mockService = MockGuideService(
         guideEntriesStreamProvider: () => Stream.value(sampleEntries),
@@ -138,31 +142,37 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap RFID filter chip
-      await tester.tap(find.widgetWithText(FilterChip, 'RFID'));
+      // Breakdown category is initially collapsed
+      expect(
+        find.text(
+            'Battery optimization, tire pressure alerts, and emergency towing.'),
+        findsNothing,
+      );
+
+      // Tap Vehicle Status & Breakdown header to expand it
+      await tester.tap(find.text('Vehicle Status & Breakdown'));
       await tester.pumpAndSettle();
 
-      // Only RFID guide should be visible
-      expect(find.text('What do I do if my RFID is not detected at the toll gantry?'),
-          findsOneWidget);
-      expect(find.text('What do I do if I get a flat tire on the expressway shoulder?'),
-          findsNothing);
-      expect(find.text('What do I do if I miss my planned expressway exit?'),
-          findsNothing);
+      // Description is now visible
+      expect(
+        find.text(
+            'Battery optimization, tire pressure alerts, and emergency towing.'),
+        findsOneWidget,
+      );
 
-      // Tap All Topics chip to restore all
-      await tester.tap(find.widgetWithText(FilterChip, 'All Topics'));
+      // Tap again to collapse it
+      await tester.tap(find.text('Vehicle Status & Breakdown'));
       await tester.pumpAndSettle();
 
-      expect(find.text('What do I do if my RFID is not detected at the toll gantry?'),
-          findsOneWidget);
-      expect(find.text('What do I do if I get a flat tire on the expressway shoulder?'),
-          findsOneWidget);
-      expect(find.text('What do I do if I miss my planned expressway exit?'),
-          findsOneWidget);
+      expect(
+        find.text(
+            'Battery optimization, tire pressure alerts, and emergency towing.'),
+        findsNothing,
+      );
     });
 
-    testWidgets('Tapping guide card navigates to GuideDetailScreen with full content',
+    testWidgets(
+        'Tapping Troubleshoot button navigates to GuideDetailScreen with full content',
         (WidgetTester tester) async {
       final mockService = MockGuideService(
         guideEntriesStreamProvider: () => Stream.value(sampleEntries),
@@ -176,9 +186,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap first card
-      await tester.tap(
-          find.text('What do I do if my RFID is not detected at the toll gantry?'));
+      // Tap Troubleshoot button in expanded RFID category
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Troubleshoot'));
       await tester.pumpAndSettle();
 
       // Should now be on GuideDetailScreen
@@ -217,7 +226,8 @@ void main() {
     testWidgets('Displays error state when guide stream fails',
         (WidgetTester tester) async {
       final mockService = MockGuideService(
-        guideEntriesStreamProvider: () => Stream.error('Firestore connection timeout'),
+        guideEntriesStreamProvider:
+            () => Stream.error('Firestore connection timeout'),
       );
 
       await tester.pumpWidget(
@@ -228,7 +238,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Couldn\'t load guide entries'), findsOneWidget);
+      expect(
+          find.textContaining('Couldn\'t load guide entries'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);
     });
   });

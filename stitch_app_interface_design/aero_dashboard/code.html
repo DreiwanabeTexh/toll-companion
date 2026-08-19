@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Dash - Driver Dashboard</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet">
 <script id="tailwind-config">
   tailwind.config = {
     darkMode: "class",
@@ -179,15 +177,13 @@
 <!-- TopAppBar -->
 <header class="bg-[#0A0A0A] border-b border-surface-variant flex items-center justify-between px-gutter h-16 w-full fixed top-0 z-50">
 <div class="flex items-center gap-3 relative">
-<img alt="Aero Mascot" class="w-10 h-10 rounded-full object-cover border-2 border-[#0088FF]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
-<div class="absolute left-12 top-0 bg-[#1A1A1A] border border-[#2A2A2A] rounded-r-lg rounded-bl-lg px-2 py-1 text-xs text-on-surface whitespace-nowrap shadow-lg z-10">
-    All clear, driver.
-</div>
-<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold hidden sm:block ml-24">Hello, Driver</h1>
+<img alt="Aero Mascot" class="w-10 h-10 rounded-full object-cover border-2 border-[#0088FF]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold">Hello, Driver</h1>
+
 </div>
 <div class="flex-1 max-w-md mx-4 relative hidden md:block">
 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
-<input class="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-full py-2 pl-10 pr-4 text-body-sm text-on-surface focus:outline-none focus:border-[#0088FF] focus:ring-1 focus:ring-[#0088FF] transition-colors" placeholder="Search routes, tolls..." type="text"/>
+<input class="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-full py-2 pl-10 pr-4 text-body-sm text-on-surface focus:outline-none focus:border-[#0088FF] focus:ring-1 focus:ring-[#0088FF] transition-colors" placeholder="Search routes, tolls..." type="text">
 </div>
 <button class="p-2 rounded-full hover:bg-surface-container-high transition-colors active:scale-95 text-on-surface-variant">
 <span class="material-symbols-outlined" data-icon="settings">settings</span>
@@ -197,7 +193,7 @@
 <!-- Mobile Search (Visible only on small screens) -->
 <div class="md:hidden relative">
 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
-<input class="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-full py-3 pl-10 pr-4 text-body-sm text-on-surface focus:outline-none focus:border-[#0088FF] focus:ring-1 focus:ring-[#0088FF] transition-colors" placeholder="Search..." type="text"/>
+<input class="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-full py-3 pl-10 pr-4 text-body-sm text-on-surface focus:outline-none focus:border-[#0088FF] focus:ring-1 focus:ring-[#0088FF] transition-colors" placeholder="Search..." type="text">
 </div>
 <!-- Balances Section -->
 <section>
@@ -227,7 +223,7 @@
 <div class="glass-card rounded-xl p-6 relative overflow-hidden group hover:border-[#0088FF]/50 transition-colors">
 <!-- Aero Peeking Background -->
 <div class="absolute -right-4 -bottom-4 w-32 h-32 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none">
-<img alt="Mascot decoration" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<img alt="Mascot decoration" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz">
 </div>
 <div class="relative z-10">
 <p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1">EasyTrip</p>
@@ -257,7 +253,7 @@
 <div class="p-4 flex items-center justify-between hover:bg-surface-container-high transition-colors group cursor-pointer">
 <div class="flex items-start gap-4">
 <div class="w-10 h-10 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 border border-[#2A2A2A]">
-<img alt="Aero icon" class="w-6 h-6 object-contain opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-[#0088FF] transition-colors">road</span>
 </div>
 <div>
 <p class="font-body-lg text-body-lg text-on-surface font-bold mb-0.5">SLEX Southbound</p>
@@ -295,7 +291,7 @@
 <div class="p-4 flex items-center justify-between hover:bg-surface-container-high transition-colors group cursor-pointer">
 <div class="flex items-start gap-4">
 <div class="w-10 h-10 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 border border-[#2A2A2A]">
-<img alt="Aero icon" class="w-6 h-6 object-contain opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-[#0088FF] transition-colors">alt_route</span>
 </div>
 <div>
 <p class="font-body-lg text-body-lg text-on-surface font-bold mb-0.5">Skyway Stage 3</p>
@@ -332,4 +328,6 @@
 <span class="font-label-caps text-label-caps mt-1">Guide</span>
 </button>
 </nav>
+
+
 </body></html>

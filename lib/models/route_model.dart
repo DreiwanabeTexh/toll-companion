@@ -10,6 +10,7 @@ class RouteModel {
   final String origin;
   final String destination;
   final List<String> segmentIds;
+  final DateTime? lastVerified; // Nullable trust field for fare & route verification
   final bool isActive;
 
   const RouteModel({
@@ -18,17 +19,33 @@ class RouteModel {
     required this.origin,
     required this.destination,
     required this.segmentIds,
+    this.lastVerified,
     this.isActive = true,
   });
 
+  /// Whether this route has been verified against official TRB/operator data.
+  bool get isVerified => lastVerified != null;
+
   factory RouteModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
+    return RouteModel.fromMap(doc.id, data);
+  }
+
+  factory RouteModel.fromMap(String id, Map<String, dynamic> data) {
+    DateTime? verifiedDate;
+    if (data['lastVerified'] is Timestamp) {
+      verifiedDate = (data['lastVerified'] as Timestamp).toDate();
+    } else if (data['lastVerified'] is String) {
+      verifiedDate = DateTime.tryParse(data['lastVerified'] as String);
+    }
+
     return RouteModel(
-      id: doc.id,
+      id: id,
       name: data['name'] as String? ?? '',
       origin: data['origin'] as String? ?? '',
       destination: data['destination'] as String? ?? '',
       segmentIds: List<String>.from(data['segmentIds'] as List? ?? []),
+      lastVerified: verifiedDate,
       isActive: data['isActive'] as bool? ?? true,
     );
   }
@@ -39,7 +56,25 @@ class RouteModel {
       'origin': origin,
       'destination': destination,
       'segmentIds': segmentIds,
+      'lastVerified':
+          lastVerified != null ? Timestamp.fromDate(lastVerified!) : null,
       'isActive': isActive,
     };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'origin': origin,
+      'destination': destination,
+      'segmentIds': segmentIds,
+      'lastVerified': lastVerified?.toIso8601String(),
+      'isActive': isActive,
+    };
+  }
+
+  factory RouteModel.fromJson(Map<String, dynamic> json) {
+    return RouteModel.fromMap(json['id'] as String? ?? '', json);
   }
 }

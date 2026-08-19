@@ -35,17 +35,26 @@ class EmergencyContact {
   factory EmergencyContact.fromFirestore(
       DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
+    return EmergencyContact.fromMap(doc.id, data);
+  }
+
+  factory EmergencyContact.fromMap(String id, Map<String, dynamic> data) {
+    DateTime? verifiedDate;
+    if (data['lastVerified'] is Timestamp) {
+      verifiedDate = (data['lastVerified'] as Timestamp).toDate();
+    } else if (data['lastVerified'] is String) {
+      verifiedDate = DateTime.tryParse(data['lastVerified'] as String);
+    }
+
     return EmergencyContact(
-      id: doc.id,
+      id: id,
       agencyName: data['agencyName'] as String? ?? '',
       agencyShort: data['agencyShort'] as String? ?? '',
       coverageArea: data['coverageArea'] as String? ?? '',
       phoneNumber: data['phoneNumber'] as String? ?? '',
       displayNumber: data['displayNumber'] as String? ?? '',
       description: data['description'] as String? ?? '',
-      lastVerified: data['lastVerified'] is Timestamp
-          ? (data['lastVerified'] as Timestamp).toDate()
-          : null,
+      lastVerified: verifiedDate,
       sortOrder: (data['sortOrder'] as num?)?.toInt() ?? 0,
       isActive: data['isActive'] as bool? ?? true,
     );
@@ -64,6 +73,25 @@ class EmergencyContact {
       'sortOrder': sortOrder,
       'isActive': isActive,
     };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'agencyName': agencyName,
+      'agencyShort': agencyShort,
+      'coverageArea': coverageArea,
+      'phoneNumber': phoneNumber,
+      'displayNumber': displayNumber,
+      'description': description,
+      'lastVerified': lastVerified?.toIso8601String(),
+      'sortOrder': sortOrder,
+      'isActive': isActive,
+    };
+  }
+
+  factory EmergencyContact.fromJson(Map<String, dynamic> json) {
+    return EmergencyContact.fromMap(json['id'] as String? ?? '', json);
   }
 
   /// Returns tel: URI string for url_launcher

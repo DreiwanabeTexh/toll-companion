@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Dash - Toll Calculator</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <script id="tailwind-config">
   tailwind.config = {
     darkMode: "class",
@@ -228,7 +226,7 @@
 <!-- TopAppBar -->
 <header class="bg-surface border-b border-surface-variant flex items-center justify-between px-gutter h-16 w-full sticky top-0 z-50">
 <div class="flex items-center gap-3 cursor-pointer active:scale-95 transition-transform">
-<img alt="Aero mascot" class="w-8 h-8 rounded-full object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<img alt="Aero mascot" class="w-8 h-8 rounded-full object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz">
 <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">Hello, Driver</h1>
 </div>
 <button aria-label="Settings" class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 transition-transform">
@@ -288,19 +286,19 @@
 </div>
 <div class="flex-grow flex gap-2">
 <label class="flex-1 cursor-pointer">
-<input checked="" class="peer sr-only" name="vehicle_class" type="radio" value="1"/>
+<input checked="" class="peer sr-only" name="vehicle_class" type="radio" value="1">
 <div class="h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant peer-checked:bg-primary-container/30 peer-checked:border-primary peer-checked:text-primary transition-colors">
                                 Class 1
                             </div>
 </label>
 <label class="flex-1 cursor-pointer">
-<input class="peer sr-only" name="vehicle_class" type="radio" value="2"/>
+<input class="peer sr-only" name="vehicle_class" type="radio" value="2">
 <div class="h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant peer-checked:bg-primary-container/30 peer-checked:border-primary peer-checked:text-primary transition-colors">
                                 Class 2
                             </div>
 </label>
 <label class="flex-1 cursor-pointer">
-<input class="peer sr-only" name="vehicle_class" type="radio" value="3"/>
+<input class="peer sr-only" name="vehicle_class" type="radio" value="3">
 <div class="h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant peer-checked:bg-primary-container/30 peer-checked:border-primary peer-checked:text-primary transition-colors">
                                 Class 3
                             </div>
@@ -317,7 +315,7 @@
             </button>
 <!-- Aero Animation Container -->
 <div class="calculating-aero absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-container/90 backdrop-blur-md rounded-full p-2 border border-[#0088FF]/50 pointer-events-none hidden" id="aeroAnimation">
-<img alt="Calculating" class="w-12 h-12 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<img alt="Calculating" class="w-12 h-12 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz">
 </div>
 </div>
 <!-- Results Section (Initially Hidden in JS, shown here for structure) -->
@@ -356,7 +354,7 @@
 </section>
 <!-- Pro Tip Box -->
 <div class="bg-surface-container border border-surface-variant rounded-xl p-4 flex gap-4 items-start mt-auto cursor-pointer hover:bg-surface-container-high transition-colors active:scale-95">
-<img alt="Aero Tip" class="w-10 h-10 rounded-full border border-outline-variant shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<img alt="Aero Tip" class="w-10 h-10 rounded-full border border-outline-variant shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz">
 <div>
 <h4 class="font-label-caps text-label-caps text-[#0088FF] mb-1">Aero's Pro Tip</h4>
 <p class="font-body-sm text-body-sm text-on-surface-variant">Make sure your EasyTrip account has at least ₱300 balance before entering NLEX Balintawak to avoid low-balance penalties.</p>

@@ -9,6 +9,11 @@ service cloud.firestore {
       allow write: if true; // TODO(deploy): revert to 'if false'
     }
 
+    match /tollPlazas/{doc} {
+      allow read: if true;
+      allow write: if true; // TODO(deploy): revert to 'if false'
+    }
+
     match /routes/{doc} {
       allow read: if true;
       allow write: if true; // TODO(deploy): revert to 'if false'
@@ -32,6 +37,12 @@ service cloud.firestore {
     match /routeBriefings/{doc} {
       allow read: if true;
       allow write: if true; // TODO(deploy): revert to 'if false'
+    }
+
+    // Phase 3: Feedback mechanism — write-only client access for data reports
+    match /dataReports/{doc} {
+      allow create: if true;
+      allow read, update, delete: if false;
     }
 
     // Deny all other collections by default

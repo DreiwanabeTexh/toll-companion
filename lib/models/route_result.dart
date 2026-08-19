@@ -1,3 +1,4 @@
+import 'fuel_estimate.dart';
 import 'toll_segment.dart';
 
 /// Represents the calculated fare breakdown for a route.
@@ -20,6 +21,33 @@ class RouteResult {
     required this.totalFare,
     this.latestVerificationDate,
   });
+
+  /// Total calculated route distance in kilometers.
+  double get totalDistanceKm =>
+      segments.fold(0.0, (sum, seg) => sum + seg.effectiveDistanceKm);
+
+  /// Computes a comprehensive Fuel and Total Trip Cost estimate for this route.
+  FuelEstimate calculateFuelEstimate({
+    VehicleProfile vehicleProfile = VehicleProfile.sedan,
+    double? customPricePerLiter,
+    double? customEfficiencyKmL,
+  }) {
+    final price = customPricePerLiter != null && customPricePerLiter > 0
+        ? customPricePerLiter
+        : FuelDefaults.defaultPricePerLiter;
+
+    final efficiency = customEfficiencyKmL != null && customEfficiencyKmL > 0
+        ? customEfficiencyKmL
+        : vehicleProfile.defaultEfficiencyKmL;
+
+    return FuelEstimate(
+      distanceKm: totalDistanceKm,
+      fuelEfficiencyKmL: efficiency,
+      fuelPricePerLiter: price,
+      tollFare: totalFare,
+      vehicleProfile: vehicleProfile,
+    );
+  }
 
   /// Factory constructor that groups segments and computes per-operator subtotals.
   factory RouteResult.calculate({

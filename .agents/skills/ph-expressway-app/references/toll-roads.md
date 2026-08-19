@@ -1,149 +1,144 @@
 # Philippine Toll Road Reference Data
 
-This document catalogs the expressways, their operators, and key toll plazas
-relevant to the app. This is reference material for building the Toll Calculator
-feature and seeding Firestore.
+This document catalogs the expressways, concessionaire operators, RFID systems, and
+key toll plazas across the Philippine expressway network. This serves as domain reference
+material for the Aero Toll Calculator and routing catalog.
 
-> **⚠️ ALL fare amounts below are approximate/placeholder values.**
-> They must be verified against official toll operator websites or signage
-> before production use. Fares change periodically via TRB-approved petitions.
+> **⚠️ NOTE:** Toll fare amounts change periodically via TRB-approved petitions.
+> Fares in the app must carry verification timestamps (`lastVerified`) and support
+> discrepancy reporting.
 
 ---
 
-## Toll Operators
+## 1. Concessionaire Toll Operators & RFID Systems
 
 ### SMC Tollways (Autosweep RFID)
+Operated by San Miguel Corporation infrastructure subsidiaries. Uses **Autosweep** RFID.
 
-San Miguel Corporation's toll road subsidiary. Uses the **Autosweep** RFID
-system (black RFID sticker).
+| Expressway | Code | Network Corridor | RFID Tag |
+|:---|:---|:---|:---|
+| STAR Tollway | `STAR` | Batangas City ↔ Sto. Tomas, Batangas | Autosweep |
+| South Luzon Expressway (SLEX) | `SLEX` | Sto. Tomas ↔ Alabang (Muntinlupa) | Autosweep |
+| Skyway Stages 1, 2, & 3 | `SKYWAY` | Alabang ↔ Buendia ↔ Balintawak (QC) | Autosweep |
+| Tarlac–Pangasinan–La Union (TPLEX) | `TPLEX` | Tarlac City ↔ Rosario, La Union | Autosweep |
+| NAIA Expressway (NAIAX) | `NAIAX` | Skyway / Sales ↔ NAIA Terminals 1–3, Macapagal | Autosweep |
+| Muntinlupa–Cavite Expressway (MCX) | `MCX` | SLEX Susana Heights ↔ Daang Hari, Cavite | Autosweep |
 
-| Expressway       | Code     | Stretch                                |
-|:-----------------|:---------|:---------------------------------------|
-| STAR Tollway     | `STAR`   | Batangas City ↔ Sto. Tomas, Batangas   |
-| SLEX             | `SLEX`   | Sto. Tomas ↔ Alabang (Muntinlupa)      |
-| Skyway Stage 3   | `SKYWAY` | Alabang ↔ Balintawak (Quezon City)     |
-| TPLEX            | `TPLEX`  | Tarlac ↔ Rosario, La Union             |
-| NAIAX            | `NAIAX`  | Skyway ↔ NAIA Terminals                |
+### Metro Pacific Tollways Corporation (Easytrip RFID)
+Operated by MPTC subsidiaries. Uses **Easytrip** RFID.
 
-### Metro Pacific Tollways Corp (Easytrip RFID)
-
-MPTC, a subsidiary of Metro Pacific Investments. Uses the **Easytrip** RFID
-system (blue RFID sticker).
-
-| Expressway       | Code      | Stretch                               |
-|:-----------------|:----------|:--------------------------------------|
-| NLEX             | `NLEX`    | Balintawak (QC) ↔ Tarlac              |
-| SCTEX            | `SCTEX`   | Clark ↔ Subic                         |
-| CAVITEX          | `CAVITEX` | Manila ↔ Cavite                       |
-| CALAX            | `CALAX`   | Mamplasan (Laguna) ↔ Silang (Cavite)  |
-| C5 Link          | `C5LINK`  | C5 Road ↔ SLEX                       |
-| CCLEX            | `CCLEX`   | Cebu ↔ Cordova (Cebu-Cordova Bridge)  |
+| Expressway | Code | Network Corridor | RFID Tag |
+|:---|:---|:---|:---|
+| North Luzon Expressway (NLEX) | `NLEX` | Balintawak (QC) / Mindanao Ave ↔ Sta. Ines (Mabalacat) | Easytrip |
+| Subic–Clark–Tarlac (SCTEX) | `SCTEX` | Subic Tipo ↔ Clark ↔ Tarlac (TPLEX Connection) | Easytrip |
+| Manila–Cavite Expressway (CAVITEX) | `CAVITEX` | Roxas Blvd (Parañaque) ↔ Kawit, Cavite | Easytrip |
+| Cavite–Laguna Expressway (CALAX) | `CALAX` | Mamplasan (SLEX) ↔ Silang / Kawit (CAVITEX) | Easytrip |
+| C5 Southlink Expressway | `C5LINK` | C5 Road (Taguig) ↔ Merville / SLEX / CAVITEX | Easytrip |
+| NLEX Connector Road | `NLEXCONN` | Caloocan Interchange ↔ España ↔ Sta. Mesa | Easytrip |
+| Cebu–Cordova Link Expressway (CCLEX) | `CCLEX` | Cebu City ↔ Cordova (Mactan Island) | Easytrip / CCLEX |
 
 ---
 
-## Key Route: Batangas → Novaliches
+## 2. Multi-Operator Corridor Example: Batangas → North Metro Manila / NLEX
 
-This is the initial personal route that the app must support.
+A representative cross-operator journey illustrating how Aero segments toll calculations:
 
 ### Segment Breakdown
 
-| # | Expressway | Segment               | Operator   | Class 1 Fare (est.) |
-|:--|:-----------|:----------------------|:-----------|:--------------------|
-| 1 | STAR       | Batangas → Lipa       | Autosweep  | ₱89                 |
-| 2 | STAR       | Lipa → Sto. Tomas     | Autosweep  | ₱57                 |
-| 3 | SLEX       | Sto. Tomas → Alabang  | Autosweep  | ₱195                |
-| 4 | Skyway 3   | Alabang → Balintawak  | Autosweep  | ₱274                |
-| 5 | NLEX       | Balintawak → Mindanao Ave | Easytrip | ₱87               |
+| # | Expressway | Segment | Concessionaire | RFID Operator | Class 1 Est. |
+|:--|:---|:---|:---|:---|:---|
+| 1 | STAR Tollway | Batangas City → Lipa | SMC Tollways | Autosweep | ₱89 |
+| 2 | STAR Tollway | Lipa → Sto. Tomas | SMC Tollways | Autosweep | ₱57 |
+| 3 | SLEX | Sto. Tomas → Alabang | SMC Tollways | Autosweep | ₱195 |
+| 4 | Skyway Stage 3 | Alabang → Balintawak | SMC Tollways | Autosweep | ₱274 |
+| 5 | NLEX | Balintawak → Mindanao Ave / Bocaue | MPTC | Easytrip | ₱87 |
 
-### Operator Summary
+### Operator Subtotal Breakdown
 
-| Operator   | Segments | Subtotal (est.) |
-|:-----------|:---------|:----------------|
-| Autosweep  | 1–4      | ₱615            |
-| Easytrip   | 5        | ₱87             |
-| **Total**  |          | **₱702**        |
+| Operator | Applicable Segments | Operator Subtotal |
+|:---|:---|:---|
+| **Autosweep RFID** | STAR (1–2), SLEX (3), Skyway 3 (4) | **₱615.00** |
+| **Easytrip RFID** | NLEX (5) | **₱87.00** |
+| **Combined Estimated Total** | All 5 Segments | **₱702.00** |
 
-### Top-Up Advisory
-
-> "Load at least **₱615 on Autosweep** and **₱87 on Easytrip** before this
-> trip."
-
-This is the core UX value proposition of the Toll Calculator.
+### Driver Action Target
+> **Top-Up Notice:** Load at least **₱615.00 on Autosweep** and **₱87.00 on Easytrip** before departure.
 
 ---
 
-## Toll Plaza Names (Reference List)
+## 3. Philippine Vehicle Classifications
 
-These are the entry/exit point names used in `tollSegments` documents.
+All Philippine tollways classify vehicles into three regulatory classes:
 
-### STAR Tollway
-- Batangas
+| Class | Eligible Vehicle Types | Toll Ratio Multiplier |
+|:---|:---|:---|
+| **Class 1** | Cars, sedans, SUVs, crossovers, pickups, passenger vans (height ≤ 7.5ft / 2 axles) | Base Fare ($1.0\times$) |
+| **Class 2** | Light trucks, medium buses, commercial delivery vans (height > 7.5ft / 2 axles) | Approx. $2.0\times$ Base Fare |
+| **Class 3** | Heavy multi-axle trucks, trailers, articulated freight haulers (3+ axles) | Approx. $3.0\times$ Base Fare |
+
+---
+
+## 4. Key Expressways & Toll Plaza Index
+
+### STAR Tollway Plazas
+- Batangas City
+- Ibaan
 - Lipa
+- Malvar
+- Tanauan
 - Sto. Tomas
 
-### SLEX
+### SLEX Plazas
 - Sto. Tomas
 - Calamba
+- Canlubang / Mayapa
+- Silangan / Cabuyao
 - Santa Rosa
-- Cabuyao
+- Greenfield / Eton City
+- Southwoods / Biñan
+- Carmona
 - San Pedro
-- Biñan
-- Alabang (Filinvest)
+- Susana Heights / MCX
+- Filinvest / Alabang
 
-### Skyway Stage 3
-- Alabang
-- Sucat
-- Bicutan
-- Nichols
-- Makati
-- Guadalupe
-- Quezon Ave
-- Balintawak
+### Skyway (Stages 1, 2, 3) Plazas
+- Alabang Main Plazas (Northbound / Southbound)
+- Sucat Exit / Entry
+- Bicutan Exit / Entry
+- Nichols / Sales Interchange
+- Buendia / Makati Ramp
+- Quirino Ave Ramp
+- Plaza Dilao Ramp
+- E. Rodriguez / Quezon Ave Ramp
+- Balintawak Main Gantry
 
-### NLEX
-- Balintawak
-- Mindanao Ave (Quirino)
-- Karuhatan (Valenzuela)
+### NLEX Plazas
+- Balintawak Barrier
+- Mindanao Avenue Barrier (Smart Connect)
+- Karuhatan / Harbor Link
 - Meycauayan
 - Marilao
-- Bocaue
-- Sta. Rita
+- Bocaue Barrier
+- Tabang (Guiguinto)
+- Balagtas
+- San Simon
 - San Fernando
+- Mexico
 - Angeles
-- Dau
-- Tarlac
+- Clark South / Dau
+- Sta. Ines
 
-### CAVITEX
-- Coastal Road (Manila)
-- Zapote
-- Kawit
-- Noveleta
+### CAVITEX & C5 Southlink Plazas
+- Parañaque Toll Plaza (Coastal Road)
+- Zapote Interchange
+- Kawit / Longos Extension
+- Merville Plaza
+- Taguig / C5 Plaza
 
-### CALAX
-- Mamplasan
+### CALAX Plazas
+- Mamplasan Barrier (SLEX interchange)
+- Laguna Technopark
 - Santa Rosa–Tagaytay
-- Silang
-
----
-
-## Notes for Implementation
-
-1. **Fare direction** — Some toll plazas have different fares for northbound vs.
-   southbound. The `direction` field in `tollSegments` handles this. For
-   simplicity in Phase 1, assume `"both"` (same fare either direction) unless
-   data shows otherwise.
-
-2. **Class types** — Philippine expressways use 3 vehicle classes:
-   - **Class 1**: Cars, SUVs, pickups, vans (most users)
-   - **Class 2**: Buses, small trucks
-   - **Class 3**: Large trucks, trailers
-   
-   The app defaults to Class 1 but should allow selection.
-
-3. **RFID interoperability** — As of 2024, Autosweep and Easytrip are NOT
-   interoperable. A driver needs BOTH stickers if crossing between SMC and
-   MPTC roads. This is a key pain point the app addresses.
-
-4. **Fare updates** — Toll fares are regulated by the TRB and change via
-   approved petitions. The `lastUpdated` field on each segment lets the app
-   show data freshness to users.
+- Silang East
+- Silang Aguinaldo
+- Governor's Drive (under construction / future expansion)

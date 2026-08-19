@@ -1,0 +1,82 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width,initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+<!-- STITCH_THREEJS_START:ANIMATION_29 class="fixed inset-0 w-full h-full bg-transparent" -->
+<div class="fixed inset-0 w-full h-full bg-transparent" style="display:block;">
+<script src="https://ajax.googleapis.com/ajax/libs/threejs/r125/three.min.js"></script>
+<div id="threejs-container-ANIMATION_29" style="width:100%;height:100%"></div>
+<script>
+(function() {
+  const container = document.getElementById('threejs-container-ANIMATION_29');
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  // Three.js script for Aero wing flap animation
+const scene = new THREE.Scene();
+const width = container.clientWidth || window.innerWidth;
+const height = container.clientHeight || window.innerHeight;
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setSize(width, height);
+container.appendChild(renderer.domElement);
+
+// Aero Silhouette / Low-poly bird
+const group = new THREE.Group();
+const bodyGeo = new THREE.ConeGeometry(0.5, 1.5, 4);
+const bodyMat = new THREE.MeshPhongMaterial({ color: 0x141414 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+body.rotation.x = Math.PI / 2;
+group.add(body);
+
+const wingGeo = new THREE.BoxGeometry(1.2, 0.1, 0.5);
+const wingMat = new THREE.MeshPhongMaterial({ color: 0x0088FF });
+const leftWing = new THREE.Mesh(wingGeo, wingMat);
+leftWing.position.x = -0.7;
+group.add(leftWing);
+
+const rightWing = new THREE.Mesh(wingGeo, wingMat);
+rightWing.position.x = 0.7;
+group.add(rightWing);
+
+scene.add(group);
+const light = new THREE.PointLight(0xffffff, 1, 100);
+light.position.set(5, 5, 5);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0x404040));
+
+camera.position.z = 3;
+
+function animate(time) {
+    requestAnimationFrame(animate);
+    const flap = Math.sin(time * 0.01) * 0.5;
+    leftWing.rotation.z = flap;
+    rightWing.rotation.z = -flap;
+    group.rotation.y += 0.01;
+    renderer.render(scene, camera);
+}
+animate(0);
+
+window.addEventListener('resize', () => {
+    const w = container.clientWidth || window.innerWidth;
+    const h = container.clientHeight || window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+});
+})();
+</script>
+</div>  
+<!-- STITCH_THREEJS_END:ANIMATION_29 -->
+
+
+</body></html>

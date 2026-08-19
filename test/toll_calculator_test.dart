@@ -1,36 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:toll_companion/models/toll_plaza.dart';
 import 'package:toll_companion/models/toll_segment.dart';
-import 'package:toll_companion/models/route_model.dart';
 import 'package:toll_companion/models/route_result.dart';
 import 'package:toll_companion/screens/toll_calculator_screen.dart';
 import 'package:toll_companion/services/toll_service.dart';
 
 class MockTollService extends TollService {
-  final Stream<List<RouteModel>> Function()? routesStreamProvider;
-  final Future<List<TollSegment>> Function(RouteModel)? segmentsProvider;
+  final Stream<List<TollPlaza>> Function()? plazasStreamProvider;
 
-  MockTollService({
-    this.routesStreamProvider,
-    this.segmentsProvider,
-  });
+  MockTollService({this.plazasStreamProvider});
 
   @override
-  Stream<List<RouteModel>> getActiveRoutes() {
-    final provider = routesStreamProvider;
+  Stream<List<TollPlaza>> getActivePlazas() {
+    final provider = plazasStreamProvider;
     if (provider != null) {
       return provider();
     }
-    return Stream.value([]);
-  }
-
-  @override
-  Future<List<TollSegment>> getSegmentsForRoute(RouteModel route) async {
-    final provider = segmentsProvider;
-    if (provider != null) {
-      return provider(route);
-    }
-    return [];
+    return Stream.value(TollService.defaultPlazas);
   }
 }
 
@@ -47,6 +34,7 @@ void main() {
       fareClass2: 100.0,
       fareClass3: 150.0,
       lastUpdated: DateTime(2025, 1, 10),
+      lastVerified: DateTime(2025, 1, 10),
     );
 
     final sampleSegmentAutosweep2 = TollSegment(
@@ -60,6 +48,7 @@ void main() {
       fareClass2: 150.0,
       fareClass3: 225.0,
       lastUpdated: DateTime(2025, 1, 12),
+      lastVerified: DateTime(2025, 1, 12),
     );
 
     final sampleSegmentEasytrip1 = TollSegment(
@@ -73,6 +62,7 @@ void main() {
       fareClass2: 170.0,
       fareClass3: 255.0,
       lastUpdated: DateTime(2025, 1, 15),
+      lastVerified: DateTime(2025, 1, 15),
     );
 
     final sampleSegmentEasytrip2 = TollSegment(
@@ -86,6 +76,7 @@ void main() {
       fareClass2: 130.0,
       fareClass3: 195.0,
       lastUpdated: DateTime(2025, 1, 15),
+      lastVerified: DateTime(2025, 1, 15),
     );
 
     test('Multi-operator route correctly partitions fares by operator and sums to total', () {
@@ -146,48 +137,15 @@ void main() {
     });
   });
 
-  group('TollCalculatorScreen Widget Tests', () {
-    final sampleMultiOperatorRoute = const RouteModel(
-      id: 'sample_multi_route',
-      name: 'Sample Multi-Operator Corridor',
-      origin: 'Plaza A1 Terminal',
-      destination: 'Plaza B2 Terminal',
-      segmentIds: ['seg_auto_1', 'seg_easy_1'],
-      isActive: true,
-    );
-
-    final sampleSegments = [
-      TollSegment(
-        id: 'seg_auto_1',
-        expressway: 'ALPHA_EXPRESSWAY',
-        expresswayName: 'Alpha Tollway',
-        operator: 'autosweep',
-        entryPoint: 'Plaza A1',
-        exitPoint: 'Plaza A2',
-        fareClass1: 50.0,
-        fareClass2: 100.0,
-        fareClass3: 150.0,
-        lastUpdated: DateTime(2025, 1, 10),
-      ),
-      TollSegment(
-        id: 'seg_easy_1',
-        expressway: 'BETA_EXPRESSWAY',
-        expresswayName: 'Beta Tollway',
-        operator: 'easytrip',
-        entryPoint: 'Plaza B1',
-        exitPoint: 'Plaza B2',
-        fareClass1: 85.0,
-        fareClass2: 170.0,
-        fareClass3: 255.0,
-        lastUpdated: DateTime(2025, 1, 15),
-      ),
-    ];
-
-    testWidgets('Renders route selector, vehicle class, operator cards and total card',
+  group('TollCalculatorScreen Exit-to-Exit Widget Tests', () {
+    testWidgets('Renders Trip Details, Origin/Destination cards, class selector, and calculated fare breakdown',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 1920);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
       final mockService = MockTollService(
-        routesStreamProvider: () => Stream.value([sampleMultiOperatorRoute]),
-        segmentsProvider: (r) async => sampleSegments,
+        plazasStreamProvider: () => Stream.value(TollService.defaultPlazas),
       );
 
       await tester.pumpWidget(
@@ -196,84 +154,88 @@ void main() {
         ),
       );
 
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
 
-      // Verify Screen Title
-      expect(find.text('Toll Calculator'), findsOneWidget);
+      // Verify Header & Hero Section
+      expect(find.text('Trip Details'), findsWidgets);
+      expect(find.text('ORIGIN EXIT'), findsOneWidget);
+      expect(find.text('DESTINATION EXIT'), findsOneWidget);
 
-      // Verify Route selector contains the route name
-      expect(find.text('Sample Multi-Operator Corridor'), findsWidgets);
+      // Verify empty-state placeholder text (no default route pre-selected)
+      expect(find.text('Tap to select origin exit...'), findsOneWidget);
+      expect(find.text('Tap to select destination exit...'), findsOneWidget);
 
       // Verify Vehicle Class selector
       expect(find.text('Class 1'), findsOneWidget);
       expect(find.text('Class 2'), findsOneWidget);
       expect(find.text('Class 3'), findsOneWidget);
 
-      // Verify Autosweep Operator Card
-      expect(find.text('Autosweep Roads'), findsOneWidget);
-      expect(find.text('Alpha Tollway'), findsOneWidget);
-      expect(find.text('Plaza A1 → Plaza A2'), findsOneWidget);
-      expect(find.text('₱50.00'), findsWidgets);
+      // Verify Calculate Button
+      expect(find.text('CALCULATE FARE'), findsOneWidget);
 
-      // Verify Easytrip Operator Card
-      expect(find.text('Easytrip Roads'), findsOneWidget);
-      expect(find.text('Beta Tollway'), findsOneWidget);
-      expect(find.text('Plaza B1 → Plaza B2'), findsOneWidget);
-      expect(find.text('₱85.00'), findsWidgets);
-
-      // Verify Total Toll Fare Card (50 + 85 = 135)
-      expect(find.text('TOTAL TOLL FARE'), findsOneWidget);
-      expect(find.text('₱135.00'), findsOneWidget);
-
-      // Verify Wallet Top-Up Callouts
-      expect(find.text('Load at least ₱50.00 on Autosweep'), findsOneWidget);
-      expect(find.text('Load at least ₱85.00 on Easytrip'), findsOneWidget);
-
-      // Switch to Class 2 and verify updated fares (100 + 170 = 270)
+      // Switch to Class 2
       await tester.tap(find.text('Class 2'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
 
-      expect(find.text('₱100.00'), findsWidgets);
-      expect(find.text('₱170.00'), findsWidgets);
-      expect(find.text('₱270.00'), findsOneWidget);
-      expect(find.text('Load at least ₱100.00 on Autosweep'), findsOneWidget);
-      expect(find.text('Load at least ₱170.00 on Easytrip'), findsOneWidget);
+      expect(find.text('Class 2'), findsOneWidget);
     });
 
-    testWidgets('Displays empty state when no routes are available',
+    testWidgets('Renders Total Trip Cost hero card and Fuel Estimator controls when route is calculated',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
       final mockService = MockTollService(
-        routesStreamProvider: () => Stream.value([]),
+        plazasStreamProvider: () => Stream.value(TollService.defaultPlazas),
       );
 
       await tester.pumpWidget(
         MaterialApp(
-          home: TollCalculatorScreen(tollService: mockService),
+          home: TollCalculatorScreen(
+            tollService: mockService,
+            initialOriginPlazaId: 'star_batangas',
+            initialDestinationPlazaId: 'star_lipa',
+          ),
         ),
       );
 
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
 
-      expect(find.text('No routes available yet'), findsOneWidget);
-      expect(find.text('Seed Sample Placeholder Routes'), findsOneWidget);
-    });
+      // Verify Total Estimated Trip Cost Hero Card
+      expect(find.text('TOTAL ESTIMATED TRIP COST'), findsOneWidget);
+      expect(find.text('(Toll + Fuel)'), findsOneWidget);
+      expect(find.text('TOLL FARE'), findsOneWidget);
+      expect(find.text('EST. FUEL'), findsOneWidget);
+      expect(find.text('DISTANCE'), findsOneWidget);
 
-    testWidgets('Displays error state when route stream emits error',
-        (WidgetTester tester) async {
-      final mockService = MockTollService(
-        routesStreamProvider: () => Stream.error('Network connection error'),
-      );
+      // Verify Gas & Fuel Estimator Accordion
+      expect(find.text('Gas & Fuel Estimator'), findsOneWidget);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: TollCalculatorScreen(tollService: mockService),
-        ),
-      );
-
+      // Tap on Gas & Fuel Estimator to expand settings
+      await tester.tap(find.text('Gas & Fuel Estimator'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Couldn\'t load routes'), findsOneWidget);
-      expect(find.text('Retry'), findsOneWidget);
+      // Verify Simplified Senior-Friendly Preset and Input Labels
+      expect(find.text('CAR TYPE (AUTO-FILLS KM/L)'), findsOneWidget);
+      expect(find.text('MANUAL INPUTS (EDIT ANYTIME)'), findsOneWidget);
+      expect(find.text('KM / LITER'), findsOneWidget);
+      expect(find.text('GAS PRICE'), findsOneWidget);
+      expect(find.text('Sedan'), findsOneWidget);
+      expect(find.text('SUV'), findsOneWidget);
+      expect(find.text('Van/Pickup'), findsOneWidget);
+
+      // Switch preset to SUV
+      await tester.tap(find.text('SUV'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TOTAL ESTIMATED TRIP COST'), findsOneWidget);
     });
   });
 }

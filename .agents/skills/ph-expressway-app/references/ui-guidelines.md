@@ -1,93 +1,130 @@
-# UI/UX Guidelines (Authoritative Reference: Nocturnal Command)
+# Aero UI/UX Guidelines (Authoritative Reference: Aero Nocturnal Command)
 
-Design principles, visual language, and component patterns for the Philippine expressway companion app.
-
----
-
-## Core Design Principle
-
-> **Designed for glanceability in low-light & automotive environments** — the user is a driver stopped or parked before or during a trip. Content must be scannable in 2–3 seconds. No dense text walls, no tiny fonts, no complex multi-layer navigation.
+Design principles, visual language, component patterns, and motion architecture for **Aero — Philippine Expressway Companion**.
 
 ---
 
-## Visual Language: Nocturnal Command
+## 🦅 Brand Identity & Persona: The Aero Bird Mascot
 
-The design system is engineered for high-stakes, low-light automotive ergonomics: glare-free, high-contrast, and focused on essential metrics.
-
-### Color Palette
-
-| Role | Color | Hex Code | Usage |
-|:---|:---|:---|:---|
-| **Canvas / Background** | Deepest Charcoal | `#0A0A0A` / `#121414` | Primary scaffold background, zero glare |
-| **Surface Level 1** | Dark Surface | `#141414` / `#1B1C1C` | App bars, search bars, inputs |
-| **Surface Level 2** | Glass Card Surface | `#1A1A1A` / `#1F2020` | Cards, modals, accordion panels |
-| **Border / Stroke** | Subtle Dark Border | `#2A2A2A` / `#343535` | 1px card outlines, list separators |
-| **Primary Action** | Electric Sky Blue | `#0088FF` | Primary buttons, active tabs, progress, links |
-| **Primary Container** | Electric Blue Tint | `#0088FF` (12% alpha) | Icon backgrounds, selected chips |
-| **Success / Verified** | Emerald Green | `#00CC88` / `#10B981` | Ready checklist items, verified badges |
-| **Warning / Caution** | Amber | `#FFA000` / `#F59E0B` | Low balance warnings, unverified badges |
-| **Emergency / Error** | Crimson Red | `#FF5252` / `#D32F2F` | Emergency call buttons, fare deductions |
-| **Text Primary** | High-Contrast Off-White | `#E3E2E2` / `#F0F0F0` | Headings, amounts, primary labels |
-| **Text Secondary** | Muted Silver / Steel | `#8A919F` / `#C0C6D6` | Descriptions, metadata, category labels |
+- **App Name**: **Aero**
+- **Mascot Asset**: The authentic Aero bird mascot silhouette asset (`assets/images/aero_mascot.png`).
+- **Small Logo / Avatar (`AeroAvatar`)**:
+  - Rendered **clean without any outer blue border or rim** across headers, category items, and dialogs.
+- **Dedicated Large Animated Mascot Hero Space (`AeroAnimatedHeroMascot` / `AeroHeroHeaderRow`)**:
+  - Sizable, prominent character presence (80px–88px) on **Home**, **Tolls**, **Emergency**, and **Quick Guide** screens:
+    - **Tolls Screen**: Positioned alongside the `"Trip Details"` heading.
+    - **Emergency Screen**: Positioned alongside the `"Emergency"` heading.
+    - **Quick Guide Screen**: Positioned alongside the `"Quick Guide"` heading.
+    - **Home Dashboard**: Positioned inside the dedicated "Aero Co-Pilot / Radar Active" hero card at the top of the dashboard.
 
 ---
 
-### Typography
+## 🎬 Native Motion Architecture: Aero Flutter Animation
 
-- **Headings**: Bold (700) or SemiBold (600), 18–24sp, Off-White `#E3E2E2`
-- **Body Text**: Regular (400), 14–16sp, high-contrast `#F0F0F0`
-- **Captions & Metadata**: Regular (400), 12–13sp, `#8A919F`
-- **Label Caps**: SemiBold (600), 11–12sp, uppercase with `0.05em` letter-spacing
-- **Numeric Amounts & Fares**: Bold (700), 20–28sp, Electric Blue `#0088FF` or Off-White
+The Aero bird mascot features a **native, 100% offline Flutter animation loop** implemented via `AnimationController` and hardware-accelerated transforms (no WebViews, no external CDN dependencies):
 
----
-
-### Component Shapes & Elevation
-
-- **Cards**: Background `#1A1A1A` with `1px` border `#2A2A2A` and `BorderRadius.circular(12)`
-- **Buttons & Inputs**: `BorderRadius.circular(8)` to `BorderRadius.circular(10)`
-- **Badges & Chips**: `BorderRadius.circular(999)` (pill shape)
-- **Tonal Elevation**: In dark mode, depth is indicated by lighter surfaces (`#1A1A1A` over `#0A0A0A`) and subtle 1px borders rather than heavy drop shadows.
+- **Floating Translation**: Gentle vertical sine oscillation ($\pm 4.5\text{px}$) mimicking mid-air hovering.
+- **Wing-Flap & Breathing**: Coordinated scale expansions ($\text{scaleX}: 1.0 \pm 0.045$, $\text{scaleY}: 1.0 \pm 0.035$) providing a lifelike aerodynamic pulse.
+- **Subtle Banking Tilt**: Smooth rotational roll ($\pm 0.035\text{ rad}$) responding to the floating cycle.
+- **Ambient Glow**: Electric blue radial elevation (`blurRadius: 20`, `alpha: 0.30`).
+- **Test Harness Safety**: Auto-bypasses continuous loops under `TestWidgetsFlutterBinding` for clean synchronous unit testing.
 
 ---
 
-## Screen Patterns
+## 🛡️ Trust-First Design System & Last-Verified Indicators (Phase 3 Standard)
 
-### 1. Home Hub Screen
-Presents a scannable grid/list of 5 feature cards:
-1. **Toll Calculator** — Route builder & multi-operator RFID fare breakdown
-2. **Pre-Trip Checklist** — Vehicle, RFID, document, and safety readiness check
-3. **Route Briefing** — Lane tips, rest stops, and exit guidance
-4. **Quick Guide** — What to do during breakdowns and RFID issues
-5. **Emergency Contacts** — Official hotlines (Tier 1) with tap-to-call
+To prevent driver misinformation, all data-driven content (Emergency hotlines, Toll fares, Route specifics) must visually display their verification status:
 
-### 2. Toll Calculator Screen
-- Route selection dropdown
-- Vehicle class segmented toggle (Class 1, 2, 3)
-- Operator breakdown cards (Autosweep vs Easytrip separated)
-- Combined Total card with actionable top-up summaries
-- Quick-launch buttons to **Pre-Trip Checklist** and **Route Briefing**
+### 1. Verification Badges
+- **Verified State**:
+  - Capsule / Pill shape with `surfaceContainerHighest` (`#343535`) background and `1px solid #2A2A2A` border.
+  - Electric Blue (`#0088FF`) verified check icon (`Icons.verified`).
+  - Text: `VERIFIED MM/YY` (Emergency Contacts) or `Fare data as of MM/YY` (Toll Calculator) in `textMuted` (`#C0C6D6`) bold 10px font.
+- **Unverified / Placeholder State**:
+  - Amber badge (`rgba(251, 191, 36, 0.15)` background with `1px solid rgba(251, 191, 36, 0.4)` border).
+  - Amber warning icon (`Icons.warning_amber_rounded`).
+  - Text: `NOT YET VERIFIED` in bold 10px Amber text.
 
-### 3. Pre-Trip Checklist Screen
-- Progress header: "X of Y items ready" with visual progress bar and completion status badge
-- Route operator awareness: Highlights relevant RFID balance items when a route is active
-- Interactive toggleable checkboxes with in-session local state
-- Reset checklist action
-- Categorized sections: RFID Wallets, Vehicle Health, Documents, Safety & Emergency
+### 2. Offline Status Banner (`AeroOfflineBanner`)
+- Displayed at the top of the content area when showing cached local data due to signal loss or network errors.
+- Styled with `surfaceContainerLow` (`#1B1C1C`), amber outline (`rgba(251, 191, 36, 0.4)`), and cloud-off icon.
+- Copy: `"Offline — showing saved emergency contacts"`, `"Offline — showing saved routes & fare tables"`.
 
-### 4. Route Briefing Screen
-- Route picker header
-- 3 structured tab/accordion views:
-  1. 🛣️ **Lane & Gantry Tips**: RFID lane approach speeds, ETC vs cash lanes, gantry etiquette
-  2. ⛽ **Rest Stops & Fuel**: Service plazas with distance/KM and amenities (Fuel, Food, Restrooms, Tire check)
-  3. ⚠️ **Exit & Fork Warnings**: Tricky interchanges, split lane guidance to avoid wrong turns
+### 3. In-App Discrepancy Reporting (`ReportDialog`)
+- Unobtrusive "Report info" / "Report fare discrepancy" flag button on each contact and fare card.
+- Opens an Aero-themed dark modal with auto-attached context chips and a description input field.
+- Submits directly to the write-only `dataReports` Firestore collection and confirms with a floating snackbar (`"Thanks, we'll review this."`).
 
-### 5. Quick Guide Screen
-- Category filter chips (`All Topics`, `RFID`, `Breakdown`, `Navigation`, `Safety`)
-- Scannable card list with category pills and chevron navigation
-- Guidance detail view with numbered step-by-step action items
+---
 
-### 6. Emergency Contacts Screen
-- Top trust disclaimer (Official Tier 1 hotlines only)
-- Contact cards with agency badge, coverage roads, and prominent verification status (`Verified: MMM YYYY` or `⚠️ Not yet verified`)
-- Full-width tap-to-call action button triggering native dialer via `url_launcher` without auto-dialing
+## 🎨 Visual Language: Nocturnal Command Tokens
+
+### Color Tokens
+
+| Token | Hex Code | Usage |
+|:---|:---|:---|
+| `surfaceBase` | `#0A0A0A` | Primary canvas scaffold background, true black |
+| `surfaceDim` | `#121414` | Sub-panels, dark avatar containers |
+| `surfaceContainerLow` | `#1B1C1C` | Input fields, collapsed accordion tiles |
+| `surfaceContainer` | `#1F2020` | Cards, modals, tip containers |
+| `surfaceCard` | `#1A1A1A` | Elevated cards, list containers |
+| `surfaceContainerHighest` | `#343535` | Verified badge chips |
+| `border` | `#2A2A2A` | 1px card outlines, list separators |
+| `outlineVariant` | `#404754` | Secondary outlines, segmented radios |
+| `neonBlue` | `#0088FF` | Electric Blue primary accent, glow shadows, active states |
+| `primaryTint` | `#A8C8FF` | Subtle highlights |
+| `successEmerald` | `#34D399` | Active RFID badge, EasyTrip indicator bar |
+| `warningAmber` | `#FBBF24` | Low balance warning, unverified chips |
+| `errorRed` | `#FF5252` | Fare deductions, destination pin, error notices |
+| `textPrimary` | `#FFFFFF` | Primary headings, display numbers |
+| `textSecondary` | `#8A919F` | Secondary descriptions, timestamps |
+| `textMuted` | `#C0C6D6` | Card labels, subtitles |
+
+### Typography Scale (Inter — Refined Balanced Automotive Values)
+
+- **`displayLg`**: **`36px` / Weight 800 / `#0088FF`** (Autosweep & EasyTrip RFID balance amounts on Home)
+- **`displayFare`**: **`34px` / Weight 800 / `#0088FF`** (Estimated Total Fare on Toll Calculator)
+- **`displayHero`**: **`36px` / Weight 800 / `#FFFFFF`** (Page hero headings: `"Emergency"`, `"Quick Guide"`)
+- **`headlineLg`**: **`32px` / Weight 800 / `#FFFFFF`** (`"Trip Details"` on Toll Calculator)
+- **`headlineLgMobile`**: **`24px` / Weight 800 / `#FFFFFF`** (`"Hello, Driver"` on Home top app bar)
+- **`titleMd`**: **`20px` / Weight 700 / `#FFFFFF`** (Section Titles, Agency Names, Category Headers)
+- **`tier1PillText`**: **`13.5px` / Weight 600 / `#FFFFFF`** (Unified status pills across Tolls, Emergency, and Guide)
+- **`bodyLg`**: **`15px` / Weight 400 / `#C0C6D6`** (Descriptions)
+- **`bodySm`**: **`13px` / Weight 400 / `#8A919F`** (Timestamps, Hints)
+- **`labelCaps`**: **`11.5px` / Weight 700 / Letter Spacing 0.08em / Uppercase** (Card labels, button tags)
+
+---
+
+## 🧭 Navigation Architecture: Persistent Bottom Tab Bar
+
+1. **🏠 Home** (`Icons.home`): Dashboard with animated mascot hero card, 36px balance numbers, and recent routes.
+2. **💳 Tolls** (`Icons.payments`): Exit-to-Exit Toll Routing Engine with Searchable Plaza Picker, animated mascot hero, 34px total fare display, strict operator subtotals, trust verification badge, and report action.
+3. **🚨 Emergency** (`Icons.emergency`): Hero header with animated mascot alongside "Emergency" heading + Tier 1 Hotlines with verification badges, report action, and 56px glowing "CALL NOW" buttons.
+4. **🧭 Guide** (`Icons.explore`): Hero header with animated mascot alongside "Quick Guide" heading + Expandable accordion troubleshooting guide.
+
+---
+
+## 🚗 Exit-to-Exit Search Picker & Routing Pattern (Phase 4 Standard)
+
+The Toll Calculator utilizes an interactive search-based exit picker allowing motorists to select any origin exit and destination exit across all interconnected Philippine expressways:
+
+### 1. Trip Details Selection Cards
+- **Origin Box**: Green indicator dot (`#34D399`), uppercase `'ORIGIN EXIT'` label, exit name + expressway code in bold, search icon.
+- **Connector Line & Reversible Swap**: Vertical link with a centered pill `'Swap'` button (`Icons.swap_vert`) to instantly invert origin and destination.
+- **Destination Box**: Red indicator dot (`#FF5252`), uppercase `'DESTINATION EXIT'` label, exit name + expressway code in bold, search icon.
+
+### 2. Searchable Exit Picker Modal (`PlazaPickerSheet`)
+- **Header**: Sheet title + close button.
+- **Live Search Bar**: Auto-filtering text field matching exit name, expressway name/code, or operator.
+- **Expressway Filter Chips**: Horizontal scrollable chips (`ALL`, `STAR`, `SLEX`, `SKYWAY`, `NLEX`, `CALAX`, `CAVITEX`, `SCTEX`, `TPLEX`).
+- **Plaza List Items**:
+  - Plaza pin indicator (electric blue when selected).
+  - Exit name (14px bold) + expressway subtitle.
+  - Interchange badge (`INTERCHANGE`) if connecting to other highways.
+  - High-contrast operator pill (`AUTOSWEEP` in emerald / `EASYTRIP` in cyan).
+
+### 3. Multi-Operator Fare Breakdown
+- **Estimated Total Fare Card**: Electric blue 34px `displayFare`, corridor breadcrumb chip chain (`STAR → SLEX → Skyway → NLEX`), trust verification indicator.
+- **Operator Breakdown Cards**: Independent Autosweep RFID and Easytrip RFID subtotal containers with strict mathematical separation.
+- **Traversed Segments Accordion**: Tap-to-expand list showing per-segment entry/exit points, expressway tags, and vehicle class fare rates.
+

@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import '../models/guide_entry.dart';
 import '../services/guide_service.dart';
+import '../theme.dart';
+import '../widgets/aero_animations.dart';
+import '../widgets/aero_mascot.dart';
+import '../widgets/aero_offline_banner.dart';
 import 'guide_detail_screen.dart';
+import 'main_navigation_scaffold.dart';
 
-/// Quick Guide screen displaying scannable list of expressway situations ("What do I do if...").
+/// Aero Quick Guide Screen featuring a dedicated animated hero mascot alongside the heading.
 class QuickGuideScreen extends StatefulWidget {
   final GuideService? guideService;
+  final bool isTab;
 
-  const QuickGuideScreen({super.key, this.guideService});
+  const QuickGuideScreen({
+    super.key,
+    this.guideService,
+    this.isTab = false,
+  });
 
   @override
   State<QuickGuideScreen> createState() => _QuickGuideScreenState();
@@ -15,289 +25,116 @@ class QuickGuideScreen extends StatefulWidget {
 
 class _QuickGuideScreenState extends State<QuickGuideScreen> {
   late final GuideService _guideService;
-  String _selectedCategory = 'all';
+  late final Stream<List<GuideEntry>> _guideStream;
+  List<GuideEntry>? _initialEntries;
   bool _isSeeding = false;
+
+  // Track expanded accordion categories (first item active by default)
+  final Set<String> _expandedCategories = {'rfid'};
 
   @override
   void initState() {
     super.initState();
     _guideService = widget.guideService ?? GuideService();
+    _guideStream = _guideService.getGuideEntries();
+    _loadInitialCache();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Quick Guide'),
+  Future<void> _loadInitialCache() async {
+    final cached = await _guideService.getCachedGuideEntries();
+    if (mounted) {
+      setState(() {
+        _initialEntries = cached;
+      });
+    }
+  }
+
+  void _toggleCategory(String categoryKey) {
+    setState(() {
+      if (_expandedCategories.contains(categoryKey)) {
+        _expandedCategories.remove(categoryKey);
+      } else {
+        // Single expansion matching reference behavior
+        _expandedCategories.clear();
+        _expandedCategories.add(categoryKey);
+      }
+    });
+  }
+
+  void _showCategoryTopicsSheet(
+    BuildContext context,
+    _CategoryGroup cat,
+    List<GuideEntry> entries,
+  ) {
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No FAQs currently filed under ${cat.title}.')),
+      );
+      return;
+    }
+
+    if (entries.length == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GuideDetailScreen(entry: entries.first),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AeroColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        side: BorderSide(color: AeroColors.border),
       ),
-      body: StreamBuilder<List<GuideEntry>>(
-        stream: _guideService.getGuideEntries(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  CircularProgressIndicator(color: Color(0xFF0088FF)),
-                  SizedBox(height: 16),
+                  const AeroAvatar(size: 36, showBorder: false),
+                  const SizedBox(width: 10),
                   Text(
-                    'Loading guide entries...',
-                    style: TextStyle(color: Color(0xFF8A919F)),
+                    '${cat.title} — FAQ Topics',
+                    style: AeroTypography.titleMd,
                   ),
                 ],
               ),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: Color(0xFFFF5252)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Couldn\'t load guide entries. Check your connection.\n${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFE3E2E2)),
+              const SizedBox(height: 14),
+              for (final entry in entries) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.article_outlined,
+                      color: AeroColors.neonBlue, size: 20),
+                  title: Text(
+                    entry.title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AeroColors.textPrimary,
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () => setState(() {}),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final allEntries = snapshot.data ?? [];
-
-          if (allEntries.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.menu_book,
-                        size: 64, color: Color(0xFF8A919F)),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'No guide entries available yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFE3E2E2),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Firestore collection "guideEntries" is currently empty.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF8A919F)),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: _isSeeding
-                          ? null
-                          : () async {
-                              setState(() => _isSeeding = true);
-                              await _guideService.seedPlaceholderDataIfEmpty();
-                              if (mounted) {
-                                setState(() => _isSeeding = false);
-                              }
-                            },
-                      icon: _isSeeding
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.cloud_upload),
-                      label: const Text('Seed Sample Placeholder Guides'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          // Filter by category
-          final filteredEntries = _selectedCategory == 'all'
-              ? allEntries
-              : allEntries
-                  .where((e) =>
-                      e.category.toLowerCase() ==
-                      _selectedCategory.toLowerCase())
-                  .toList();
-
-          return Column(
-            children: [
-              // Category filter chips bar
-              Container(
-                color: const Color(0xFF141414),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 10.0,
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('all', 'All Topics'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('rfid', 'RFID'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('breakdown', 'Breakdown'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('navigation', 'Navigation'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('safety', 'Safety'),
-                    ],
                   ),
+                  trailing: const Icon(Icons.chevron_right,
+                      color: AeroColors.textSecondary),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GuideDetailScreen(entry: entry),
+                      ),
+                    );
+                  },
                 ),
-              ),
-
-              const Divider(height: 1, color: Color(0xFF2A2A2A)),
-
-              // Entries List
-              Expanded(
-                child: filteredEntries.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No guides found in this category.',
-                          style: TextStyle(color: Color(0xFF8A919F)),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16.0),
-                        itemCount: filteredEntries.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final entry = filteredEntries[index];
-                          return _buildGuideCard(entry);
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String categoryKey, String label) {
-    final isSelected = _selectedCategory == categoryKey;
-    return FilterChip(
-      selected: isSelected,
-      label: Text(label),
-      onSelected: (_) {
-        setState(() {
-          _selectedCategory = categoryKey;
-        });
-      },
-      selectedColor: const Color(0xFF0088FF).withValues(alpha: 0.2),
-      backgroundColor: const Color(0xFF1A1A1A),
-      labelStyle: TextStyle(
-        fontSize: 13,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? const Color(0xFF0088FF) : const Color(0xFF8A919F),
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isSelected ? const Color(0xFF0088FF) : const Color(0xFF2A2A2A),
-        ),
-      ),
-      showCheckmark: false,
-    );
-  }
-
-  Widget _buildGuideCard(GuideEntry entry) {
-    final categoryColor = _getCategoryColor(entry.category);
-
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GuideDetailScreen(entry: entry),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: categoryColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: categoryColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: categoryColor.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Text(
-                        _formatCategory(entry.category).toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: categoryColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      entry.title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFE3E2E2),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      entry.shortTitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF8A919F),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: Color(0xFF8A919F)),
+                const Divider(height: 1, color: AeroColors.border),
+              ],
             ],
           ),
         ),
@@ -305,33 +142,490 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
     );
   }
 
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'rfid':
-        return const Color(0xFFFFA000); // Amber
-      case 'breakdown':
-        return const Color(0xFFFF5252); // Red
-      case 'navigation':
-        return const Color(0xFF0088FF); // Blue
-      case 'safety':
-        return const Color(0xFF00CC88); // Green
-      default:
-        return const Color(0xFF0088FF);
-    }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AeroColors.surfaceBase,
+      // Tier 1 Header with clean no-ring avatar and rotating speech bubble
+      appBar: const AeroTopBar(
+        phrases: AeroTopBar.guidePhrases,
+      ),
+      body: StreamBuilder<List<GuideEntry>>(
+        stream: _guideStream,
+        initialData: _initialEntries,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: AeroColors.neonBlue),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading guide entries...',
+                    style: TextStyle(color: AeroColors.textSecondary),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            // Offline fallback
+            return FutureBuilder<List<GuideEntry>?>(
+              future: _guideService.getCachedGuideEntries(),
+              builder: (context, cacheSnapshot) {
+                final cachedEntries = cacheSnapshot.data;
+                if (cachedEntries != null && cachedEntries.isNotEmpty) {
+                  return _buildGuideContent(cachedEntries, isOffline: true);
+                }
+
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            size: 48, color: AeroColors.errorRed),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Couldn\'t load guide entries. Check your connection.\n${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AeroColors.textPrimary),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => setState(() {}),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          }
+
+          final allEntries = snapshot.data ?? [];
+
+          if (allEntries.isEmpty) {
+            // Check offline cache if Firestore returned empty
+            return FutureBuilder<List<GuideEntry>?>(
+              future: _guideService.getCachedGuideEntries(),
+              builder: (context, cacheSnapshot) {
+                final cachedEntries = cacheSnapshot.data;
+                if (cachedEntries != null && cachedEntries.isNotEmpty) {
+                  return _buildGuideContent(cachedEntries, isOffline: true);
+                }
+
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.menu_book,
+                            size: 64, color: AeroColors.textSecondary),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No guide entries available yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AeroColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Firestore collection "guideEntries" is currently empty.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AeroColors.textSecondary),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _isSeeding
+                              ? null
+                              : () async {
+                                  setState(() => _isSeeding = true);
+                                  await _guideService.seedPlaceholderDataIfEmpty();
+                                  if (mounted) {
+                                    setState(() => _isSeeding = false);
+                                  }
+                                },
+                          icon: _isSeeding
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.cloud_upload),
+                          label: const Text('Seed Sample Placeholder Guides'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          }
+
+          return _buildGuideContent(allEntries, isOffline: false);
+        },
+      ),
+    );
   }
 
-  String _formatCategory(String category) {
-    switch (category.toLowerCase()) {
-      case 'rfid':
-        return 'RFID';
-      case 'breakdown':
-        return 'Breakdown';
-      case 'navigation':
-        return 'Navigation';
-      case 'safety':
-        return 'Safety';
-      default:
-        return category;
-    }
+  Widget _buildGuideContent(List<GuideEntry> allEntries, {required bool isOffline}) {
+    // Categories with topic-specific icons and accent colors
+    final categories = [
+      const _CategoryGroup(
+        key: 'rfid',
+        title: 'RFID & Tolls',
+        description:
+            'Transponder issues, toll zone discrepancies, and account linking.',
+        icon: Icons.contactless_rounded,
+        color: AeroColors.neonBlue,
+      ),
+      const _CategoryGroup(
+        key: 'breakdown',
+        title: 'Vehicle Status & Breakdown',
+        description:
+            'Battery optimization, tire pressure alerts, and emergency towing.',
+        icon: Icons.car_repair_rounded,
+        color: AeroColors.warningAmber,
+      ),
+      const _CategoryGroup(
+        key: 'navigation',
+        title: 'Expressway Navigation',
+        description:
+            'Interchange splits, missed exits, and speed limit rules.',
+        icon: Icons.alt_route_rounded,
+        color: const Color(0xFF60A5FA),
+      ),
+      const _CategoryGroup(
+        key: 'safety',
+        title: 'Road Safety Protocols',
+        description:
+            'Severe weather, breakdown lane parking, and hazard protocols.',
+        icon: Icons.shield_rounded,
+        color: AeroColors.successEmerald,
+      ),
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Dedicated Hero Space: Large Mascot Illustration alongside Page Heading
+          const AeroHeroHeaderRow(
+            title: 'Quick Guide',
+            subtitle:
+                'Select a category for troubleshooting and assistance.',
+            mascotSize: 108,
+          ),
+
+          const SizedBox(height: 16),
+
+          if (isOffline)
+            const AeroOfflineBanner(
+              message: 'Offline — showing saved troubleshooting guides',
+            ),
+
+          // Expandable Accordion List
+          for (final cat in categories) ...[
+            _buildAccordionCategory(cat, allEntries),
+            const SizedBox(height: 12),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Need Human Assistance Card
+          _buildContactSupportCard(context),
+        ],
+      ),
+    );
   }
+
+  Widget _buildAccordionCategory(
+    _CategoryGroup cat,
+    List<GuideEntry> allEntries,
+  ) {
+    final isExpanded = _expandedCategories.contains(cat.key);
+    final categoryEntries = allEntries
+        .where((e) => e.category.toLowerCase() == cat.key.toLowerCase())
+        .toList();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      decoration: BoxDecoration(
+        color: isExpanded
+            ? AeroColors.surfaceContainerLow
+            : AeroColors.surfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isExpanded
+              ? cat.color.withValues(alpha: 0.45)
+              : AeroColors.outlineVariant.withValues(alpha: 0.3),
+        ),
+        boxShadow: isExpanded
+            ? [
+                BoxShadow(
+                  color: cat.color.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
+              ]
+            : AeroGlow.subtleCardGlow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Accordion Header Button
+          AeroBouncyTap(
+            scaleDown: 0.98,
+            onTap: () => _toggleCategory(cat.key),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  // Topic-specific Category Icon Badge
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: cat.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: cat.color.withValues(alpha: 0.35),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        cat.icon,
+                        size: 22,
+                        color: cat.color,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      cat.title,
+                      style: AeroTypography.titleMd,
+                    ),
+                  ),
+                  Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: isExpanded
+                        ? cat.color
+                        : AeroColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Expanded Content Area
+          if (isExpanded) ...[
+            Padding(
+              padding: const EdgeInsets.only(
+                left: 74.0,
+                right: 16.0,
+                bottom: 16.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cat.description,
+                    style: AeroTypography.bodySm,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Action Buttons: Troubleshoot & View FAQ with tactile bounce
+                  Row(
+                    children: [
+                      AeroBouncyTap(
+                        scaleDown: 0.94,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (categoryEntries.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => GuideDetailScreen(
+                                    entry: categoryEntries.first,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'No troubleshooting entry available for ${cat.title}.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AeroColors.surfaceContainer,
+                            foregroundColor: AeroColors.textPrimary,
+                            side: const BorderSide(
+                              color: AeroColors.outlineVariant,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Troubleshoot',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      AeroBouncyTap(
+                        scaleDown: 0.94,
+                        child: TextButton(
+                          onPressed: () => _showCategoryTopicsSheet(
+                            context,
+                            cat,
+                            categoryEntries,
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AeroColors.neonBlue,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'View FAQ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactSupportCard(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AeroColors.border,
+        ),
+        boxShadow: AeroGlow.subtleCardGlow,
+      ),
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.support_agent_rounded,
+                color: AeroColors.neonBlue,
+                size: 24,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Need human assistance?',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AeroColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Connect directly to official 24/7 expressway patrol dispatchers and support teams.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AeroColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: AeroBouncyTap(
+              scaleDown: 0.97,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  MainNavigationScaffold.switchTab(context, 2);
+                },
+                icon: const Icon(Icons.phone, size: 16),
+                label: const Text(
+                  'Contact Support',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AeroColors.neonBlue,
+                  side: const BorderSide(color: AeroColors.neonBlue, width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryGroup {
+  final String key;
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+
+  const _CategoryGroup({
+    required this.key,
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+  });
 }

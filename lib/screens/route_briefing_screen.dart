@@ -30,6 +30,7 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
     with SingleTickerProviderStateMixin {
   late final BriefingService _briefingService;
   late final TollService _tollService;
+  late final Stream<List<RouteModel>> _routesStream;
   late TabController _tabController;
 
   String? _selectedRouteId;
@@ -40,6 +41,7 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
     super.initState();
     _briefingService = widget.briefingService ?? BriefingService();
     _tollService = widget.tollService ?? TollService();
+    _routesStream = _tollService.getActiveRoutes();
     _tabController = TabController(length: 3, vsync: this);
     _selectedRouteId = widget.routeId ?? widget.route?.id;
   }
@@ -52,11 +54,14 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Check for arguments passed via named route
-    final routeArg =
-        widget.route ?? (ModalRoute.of(context)?.settings.arguments as RouteModel?);
-    if (_selectedRouteId == null && routeArg != null) {
-      _selectedRouteId = routeArg.id;
+    // Check for arguments passed via named route (can be RouteModel or String routeId)
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (_selectedRouteId == null) {
+      if (args is RouteModel) {
+        _selectedRouteId = args.id;
+      } else if (args is String) {
+        _selectedRouteId = args;
+      }
     }
 
     return Scaffold(
@@ -64,7 +69,8 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
         title: const Text('Route Briefing'),
       ),
       body: StreamBuilder<List<RouteModel>>(
-        stream: _tollService.getActiveRoutes(),
+        stream: _routesStream,
+        initialData: TollService.defaultRoutes,
         builder: (context, routesSnapshot) {
           final routes = routesSnapshot.data ?? [];
 
@@ -96,7 +102,9 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
                             )
                           : DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: _selectedRouteId,
+                                value: routes.any((r) => r.id == _selectedRouteId)
+                                    ? _selectedRouteId
+                                    : (routes.isNotEmpty ? routes.first.id : null),
                                 isExpanded: true,
                                 dropdownColor: const Color(0xFF1A1A1A),
                                 style: const TextStyle(
