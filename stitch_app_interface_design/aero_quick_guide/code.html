@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash - Quick Guide</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-primary-fixed-variant": "#004689",
+                "on-secondary-fixed-variant": "#474646",
+                "on-primary": "#003061",
+                "surface-container-lowest": "#0d0e0f",
+                "surface-container-low": "#1b1c1c",
+                "on-secondary-container": "#bab8b7",
+                "on-primary-container": "#002955",
+                "surface-variant": "#343535",
+                "on-tertiary-fixed-variant": "#474746",
+                "tertiary-container": "#929090",
+                "on-tertiary-fixed": "#1c1b1b",
+                "error": "#ffb4ab",
+                "secondary-fixed": "#e5e2e1",
+                "secondary-fixed-dim": "#c9c6c5",
+                "surface-container": "#1f2020",
+                "outline-variant": "#404754",
+                "surface-bright": "#383939",
+                "on-secondary": "#313030",
+                "tertiary": "#c8c6c5",
+                "error-container": "#93000a",
+                "surface-container-high": "#292a2a",
+                "secondary-container": "#4a4949",
+                "inverse-primary": "#005eb3",
+                "on-tertiary": "#313030",
+                "primary-container": "#3491ff",
+                "on-error": "#690005",
+                "tertiary-fixed-dim": "#c8c6c5",
+                "surface-container-highest": "#343535",
+                "inverse-on-surface": "#303031",
+                "primary-fixed": "#d5e3ff",
+                "surface-dim": "#121414",
+                "on-error-container": "#ffdad6",
+                "on-primary-fixed": "#001b3c",
+                "surface": "#121414",
+                "on-surface": "#e3e2e2",
+                "secondary": "#c9c6c5",
+                "inverse-surface": "#e3e2e2",
+                "tertiary-fixed": "#e5e2e1",
+                "background": "#000000",
+                "primary-fixed-dim": "#a8c8ff",
+                "surface-tint": "#a8c8ff",
+                "primary": "#a8c8ff",
+                "on-tertiary-container": "#2a2a2a",
+                "on-surface-variant": "#c0c6d6",
+                "on-background": "#e3e2e2",
+                "on-secondary-fixed": "#1c1b1b",
+                "outline": "#8a919f"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "xs": "4px",
+                "sm": "12px",
+                "gutter": "16px",
+                "container-margin": "24px",
+                "base": "8px",
+                "lg": "24px",
+                "md": "16px",
+                "xl": "40px"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "display-lg": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "title-md": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Accordion transition styles */
+        .accordion-content {
+            transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out, margin 0.3s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin-top: 0;
+        }
+        
+        .accordion-item.active .accordion-content {
+            max-height: 200px;
+            opacity: 1;
+            margin-top: 12px;
+        }
+
+        .accordion-item.active {
+            box-shadow: 0 0 20px rgba(52, 145, 255, 0.15);
+            border-color: rgba(52, 145, 255, 0.4);
+            background-color: rgba(27, 28, 28, 0.8);
+        }
+
+        .accordion-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .accordion-item.active .accordion-icon {
+            transform: rotate(180deg);
+        }
+    </style>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const accordions = document.querySelectorAll('.accordion-button');
+            
+            accordions.forEach(button => {
+                button.addEventListener('click', () => {
+                    const item = button.closest('.accordion-item');
+                    const isActive = item.classList.contains('active');
+                    
+                    // Close all
+                    document.querySelectorAll('.accordion-item').forEach(acc => {
+                        acc.classList.remove('active');
+                    });
+                    
+                    // Toggle current
+                    if (!isActive) {
+                        item.classList.add('active');
+                    }
+                });
+            });
+            
+            // Set first item active by default
+            const firstItem = document.querySelector('.accordion-item');
+            if(firstItem) firstItem.classList.add('active');
+        });
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col relative overflow-x-hidden font-body-sm selection:bg-primary/30">
+<!-- TopAppBar Component -->
+<nav class="flex items-center justify-between px-gutter h-16 w-full sticky top-0 z-50 bg-surface border-b border-surface-variant transition-all duration-300">
+<!-- Leading: Avatar -->
+<div class="flex items-center p-1 cursor-pointer hover:bg-surface-container-high transition-colors active:scale-95 transition-transform rounded-full">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-lowest border border-outline-variant">
+<img alt="Aero mascot" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+</div>
+<!-- Headline -->
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">Hello, Driver</h1>
+<!-- Trailing: Icon -->
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 transition-transform">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-4xl mx-auto pt-4 pb-24 px-gutter z-10 relative">
+<!-- Page Header -->
+<header class="mb-8">
+<h2 class="font-display-lg text-display-lg text-on-background mb-2">Quick Guide</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Select a category for troubleshooting and assistance.</p>
+</header>
+<!-- Categories Accordion List -->
+<div class="flex flex-col gap-3">
+<!-- Category 1: RFID & Tolls -->
+<div class="accordion-item bg-surface-container-low border border-outline-variant/30 rounded-xl transition-all duration-300 overflow-hidden">
+<button class="accordion-button w-full text-left p-4 flex items-center justify-between group active:scale-[0.99] transition-transform">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 shrink-0 rounded-lg bg-surface flex items-center justify-center p-1 relative z-10 border border-outline-variant/50">
+<img alt="Aero Mascot RFID" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-background">RFID &amp; Tolls</h3>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant accordion-icon group-hover:text-primary transition-colors">expand_more</span>
+</button>
+<div class="accordion-content px-4 pb-4 pl-[76px]">
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Transponder issues, toll zone discrepancies, and account linking.</p>
+<div class="flex gap-2">
+<button class="bg-surface-container border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">Troubleshoot</button>
+<button class="bg-transparent border border-transparent text-primary px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-primary/10 transition-colors">View FAQ</button>
+</div>
+</div>
+</div>
+<!-- Category 2: Vehicle Telemetry -->
+<div class="accordion-item bg-surface-container-low border border-outline-variant/30 rounded-xl transition-all duration-300 overflow-hidden">
+<button class="accordion-button w-full text-left p-4 flex items-center justify-between group active:scale-[0.99] transition-transform">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 shrink-0 rounded-lg bg-surface flex items-center justify-center p-1 relative z-10 border border-outline-variant/50">
+<img alt="Aero Mascot Status" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-background">Vehicle Status</h3>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant accordion-icon group-hover:text-primary transition-colors">expand_more</span>
+</button>
+<div class="accordion-content px-4 pb-4 pl-[76px]">
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Battery optimization, tire pressure alerts, and system diagnostics.</p>
+<div class="flex gap-2">
+<button class="bg-surface-container border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">Run Diagnostics</button>
+<button class="bg-transparent border border-transparent text-primary px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-primary/10 transition-colors">View Manual</button>
+</div>
+</div>
+</div>
+<!-- Category 3: Navigation -->
+<div class="accordion-item bg-surface-container-low border border-outline-variant/30 rounded-xl transition-all duration-300 overflow-hidden">
+<button class="accordion-button w-full text-left p-4 flex items-center justify-between group active:scale-[0.99] transition-transform">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 shrink-0 rounded-lg bg-surface flex items-center justify-center p-1 relative z-10 border border-outline-variant/50">
+<img alt="Aero Mascot Map" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-background">Navigation</h3>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant accordion-icon group-hover:text-primary transition-colors">expand_more</span>
+</button>
+<div class="accordion-content px-4 pb-4 pl-[76px]">
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4">GPS signal loss, routing errors, and offline map downloads.</p>
+<div class="flex gap-2">
+<button class="bg-surface-container border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">Update Maps</button>
+<button class="bg-transparent border border-transparent text-primary px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-primary/10 transition-colors">GPS Reset</button>
+</div>
+</div>
+</div>
+<!-- Category 4: General Settings -->
+<div class="accordion-item bg-surface-container-low border border-outline-variant/30 rounded-xl transition-all duration-300 overflow-hidden">
+<button class="accordion-button w-full text-left p-4 flex items-center justify-between group active:scale-[0.99] transition-transform">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 shrink-0 rounded-lg bg-surface flex items-center justify-center p-1 relative z-10 border border-outline-variant/50">
+<img alt="Aero Mascot Settings" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<h3 class="font-title-md text-title-md text-on-background">App Settings</h3>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant accordion-icon group-hover:text-primary transition-colors">expand_more</span>
+</button>
+<div class="accordion-content px-4 pb-4 pl-[76px]">
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Account management, notification preferences, and display themes.</p>
+<div class="flex gap-2">
+<button class="bg-surface-container border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-label-caps text-label-caps hover:bg-surface-container-high transition-colors">Open Settings</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Call to Action -->
+<div class="mt-8 bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-4xl text-primary mb-2">support_agent</span>
+<h4 class="font-title-md text-title-md text-on-background mb-1">Need human assistance?</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-4">Our support team is available 24/7 for critical issues.</p>
+<button class="bg-primary/10 border border-primary text-primary px-6 py-3 rounded-full font-label-caps text-label-caps hover:bg-primary/20 transition-colors focus:ring-2 focus:ring-primary/50 focus:outline-none">
+                Contact Support
+            </button>
+</div>
+</main>
+<!-- BottomNavBar Component -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-sm py-base z-50 bg-surface-container border-t border-surface-variant">
+<!-- Home (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16 h-12" href="#">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<!-- Tolls (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16 h-12" href="#">
+<span class="material-symbols-outlined mb-1">payments</span>
+<span class="font-label-caps text-label-caps">Tolls</span>
+</a>
+<!-- Emergency (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16 h-12" href="#">
+<span class="material-symbols-outlined mb-1">emergency</span>
+<span class="font-label-caps text-label-caps">Emergency</span>
+</a>
+<!-- Guide (Active) -->
+<a class="flex flex-col items-center justify-center text-primary bg-primary-container/10 rounded-xl py-1 active:scale-90 transition-transform w-16 h-12" href="#">
+<span class="material-symbols-outlined icon-fill mb-1">explore</span>
+<span class="font-label-caps text-label-caps">Guide</span>
+</a>
+</nav>
+</body></html>

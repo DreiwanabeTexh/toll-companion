@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash - Toll Calculator</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-primary-fixed-variant": "#004689",
+                "on-secondary-fixed-variant": "#474646",
+                "on-primary": "#003061",
+                "surface-container-lowest": "#0d0e0f",
+                "surface-container-low": "#1b1c1c",
+                "on-secondary-container": "#bab8b7",
+                "on-primary-container": "#002955",
+                "surface-variant": "#343535",
+                "on-tertiary-fixed-variant": "#474746",
+                "tertiary-container": "#929090",
+                "on-tertiary-fixed": "#1c1b1b",
+                "error": "#ffb4ab",
+                "secondary-fixed": "#e5e2e1",
+                "secondary-fixed-dim": "#c9c6c5",
+                "surface-container": "#1f2020",
+                "outline-variant": "#404754",
+                "surface-bright": "#383939",
+                "on-secondary": "#313030",
+                "tertiary": "#c8c6c5",
+                "error-container": "#93000a",
+                "surface-container-high": "#292a2a",
+                "secondary-container": "#4a4949",
+                "inverse-primary": "#005eb3",
+                "on-tertiary": "#313030",
+                "primary-container": "#3491ff",
+                "on-error": "#690005",
+                "tertiary-fixed-dim": "#c8c6c5",
+                "surface-container-highest": "#343535",
+                "inverse-on-surface": "#303031",
+                "primary-fixed": "#d5e3ff",
+                "surface-dim": "#121414",
+                "on-error-container": "#ffdad6",
+                "on-primary-fixed": "#001b3c",
+                "surface": "#121414",
+                "on-surface": "#e3e2e2",
+                "secondary": "#c9c6c5",
+                "inverse-surface": "#e3e2e2",
+                "tertiary-fixed": "#e5e2e1",
+                "background": "#000000",
+                "primary-fixed-dim": "#a8c8ff",
+                "surface-tint": "#a8c8ff",
+                "primary": "#a8c8ff",
+                "on-tertiary-container": "#2a2a2a",
+                "on-surface-variant": "#c0c6d6",
+                "on-background": "#e3e2e2",
+                "on-secondary-fixed": "#1c1b1b",
+                "outline": "#8a919f"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "xs": "4px",
+                "sm": "12px",
+                "gutter": "16px",
+                "container-margin": "24px",
+                "base": "8px",
+                "lg": "24px",
+                "md": "16px",
+                "xl": "40px",
+                "touch-target": "56px"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "display-lg": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "title-md": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .glass-card {
+            background-color: rgba(18, 20, 20, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(168, 200, 255, 0.1);
+        }
+        
+        .glow-button {
+            transition: all 0.3s ease;
+        }
+        .glow-button:active, .glow-button.active {
+            box-shadow: 0 0 15px 2px rgba(0, 136, 255, 0.6);
+            transform: scale(0.98);
+        }
+
+        .input-glass {
+            background-color: rgba(31, 32, 32, 0.6);
+            border: 1px solid rgba(168, 200, 255, 0.2);
+            color: #FFFFFF;
+            transition: all 0.3s ease;
+        }
+        .input-glass:focus {
+            outline: none;
+            border-color: #0088FF;
+            box-shadow: 0 0 10px 1px rgba(0, 136, 255, 0.4);
+        }
+
+        /* Shader Background - Night Sky */
+        body {
+            background-color: #000000;
+            background-image: 
+                radial-gradient(1px 1px at 10% 20%, #ffffff 100%, transparent),
+                radial-gradient(1px 1px at 30% 40%, #ffffff 100%, transparent),
+                radial-gradient(1px 1px at 50% 60%, #ffffff 100%, transparent),
+                radial-gradient(1px 1px at 70% 80%, #ffffff 100%, transparent),
+                radial-gradient(1px 1px at 90% 10%, #ffffff 100%, transparent),
+                radial-gradient(2px 2px at 20% 80%, rgba(168, 200, 255, 0.8) 100%, transparent),
+                radial-gradient(2px 2px at 80% 30%, rgba(168, 200, 255, 0.8) 100%, transparent);
+            background-attachment: fixed;
+        }
+
+        /* Loading Animation */
+        .calculating-aero {
+            animation: bounce-float 2s infinite ease-in-out;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .calculating-aero.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        @keyframes bounce-float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.05); }
+        }
+        
+        /* Hide scrollbar for clean UI */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-black text-on-background min-h-screen flex flex-col font-body-sm antialiased overflow-x-hidden selection:bg-primary-container selection:text-white">
+<!-- TopAppBar -->
+<header class="bg-surface border-b border-surface-variant flex items-center justify-between px-gutter h-16 w-full sticky top-0 z-50">
+<div class="flex items-center gap-3 cursor-pointer active:scale-95 transition-transform">
+<img alt="Aero mascot" class="w-8 h-8 rounded-full object-cover border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">Hello, Driver</h1>
+</div>
+<button aria-label="Settings" class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-[24px] pb-[100px] px-container-margin md:max-w-3xl md:mx-auto w-full flex flex-col gap-6">
+<!-- Route Selection Section (Glassmorphism) -->
+<section class="glass-card rounded-xl p-5 flex flex-col gap-4 relative z-10">
+<h2 class="font-title-md text-title-md text-on-surface mb-2">Trip Details</h2>
+<div class="relative flex flex-col gap-6">
+<!-- Vertical Line Connector -->
+<div class="absolute left-4 top-8 bottom-8 w-0.5 bg-surface-variant z-0 rounded-full"></div>
+<!-- Entry Point -->
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border-2 border-primary flex items-center justify-center shrink-0 mt-1">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<div class="flex-grow">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1">Entry Plaza</label>
+<div class="relative">
+<select class="input-glass w-full h-12 rounded-lg px-4 appearance-none font-body-sm text-body-sm cursor-pointer">
+<option disabled="" selected="" value="">Select starting point...</option>
+<option value="balintawak">Balintawak (NLEX)</option>
+<option value="bocaue">Bocaue</option>
+<option value="clark">Clark South</option>
+<option value="sctex_mabalacat">Mabalacat (SCTEX)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Exit Point -->
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border-2 border-error flex items-center justify-center shrink-0 mt-1">
+<span class="material-symbols-outlined text-error text-[16px]" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="flex-grow">
+<label class="block font-label-caps text-label-caps text-on-surface-variant mb-1 ml-1">Exit Plaza</label>
+<div class="relative">
+<select class="input-glass w-full h-12 rounded-lg px-4 appearance-none font-body-sm text-body-sm cursor-pointer">
+<option disabled="" selected="" value="">Select destination...</option>
+<option value="bocaue">Bocaue (NLEX)</option>
+<option value="san_fernando">San Fernando</option>
+<option value="tarlac">Tarlac (SCTEX)</option>
+<option value="rosario">Rosario (TPLEX)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Vehicle Class -->
+<div class="flex items-center gap-4 mt-2">
+<div class="w-8 h-8 rounded-full bg-transparent flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant">directions_car</span>
+</div>
+<div class="flex-grow flex gap-2">
+<label class="flex-1 cursor-pointer">
+<input checked="" class="peer sr-only" name="vehicle_class" type="radio" value="1"/>
+<div class="h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant peer-checked:bg-primary-container/30 peer-checked:border-primary peer-checked:text-primary transition-colors">
+                                Class 1
+                            </div>
+</label>
+<label class="flex-1 cursor-pointer">
+<input class="peer sr-only" name="vehicle_class" type="radio" value="2"/>
+<div class="h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant peer-checked:bg-primary-container/30 peer-checked:border-primary peer-checked:text-primary transition-colors">
+                                Class 2
+                            </div>
+</label>
+<label class="flex-1 cursor-pointer">
+<input class="peer sr-only" name="vehicle_class" type="radio" value="3"/>
+<div class="h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant peer-checked:bg-primary-container/30 peer-checked:border-primary peer-checked:text-primary transition-colors">
+                                Class 3
+                            </div>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Calculate Action -->
+<div class="flex justify-center relative my-4">
+<button class="glow-button bg-[#0088FF] text-white font-label-caps text-label-caps h-touch-target px-10 rounded-full flex items-center justify-center gap-2 w-full md:w-auto shadow-[0_0_20px_rgba(0,136,255,0.3)]" id="calculateBtn">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calculate</span>
+                Calculate Fare
+            </button>
+<!-- Aero Animation Container -->
+<div class="calculating-aero absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-container/90 backdrop-blur-md rounded-full p-2 border border-[#0088FF]/50 pointer-events-none hidden" id="aeroAnimation">
+<img alt="Calculating" class="w-12 h-12 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+</div>
+<!-- Results Section (Initially Hidden in JS, shown here for structure) -->
+<section class="glass-card rounded-xl p-5 flex flex-col gap-4 transition-all duration-500 opacity-50 pointer-events-none" id="resultsSection">
+<div class="flex justify-between items-center border-b border-surface-variant pb-3">
+<h3 class="font-title-md text-title-md text-on-surface">Estimated Fare</h3>
+<div class="text-right">
+<span class="font-display-lg text-display-lg text-[#0088FF] block">₱425</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">Total Amount</span>
+</div>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Breakdown Item -->
+<div class="bg-surface-container-lowest rounded-lg p-3 flex justify-between items-center border border-surface-variant">
+<div class="flex items-center gap-3">
+<div class="w-2 h-8 bg-blue-500 rounded-full"></div>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface block">Autosweep</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">SLEX, TPLEX</span>
+</div>
+</div>
+<span class="font-title-md text-title-md text-on-surface">₱180</span>
+</div>
+<!-- Breakdown Item -->
+<div class="bg-surface-container-lowest rounded-lg p-3 flex justify-between items-center border border-surface-variant">
+<div class="flex items-center gap-3">
+<div class="w-2 h-8 bg-emerald-500 rounded-full"></div>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface block">EasyTrip</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">NLEX, SCTEX</span>
+</div>
+</div>
+<span class="font-title-md text-title-md text-on-surface">₱245</span>
+</div>
+</div>
+</section>
+<!-- Pro Tip Box -->
+<div class="bg-surface-container border border-surface-variant rounded-xl p-4 flex gap-4 items-start mt-auto cursor-pointer hover:bg-surface-container-high transition-colors active:scale-95">
+<img alt="Aero Tip" class="w-10 h-10 rounded-full border border-outline-variant shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<div>
+<h4 class="font-label-caps text-label-caps text-[#0088FF] mb-1">Aero's Pro Tip</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Make sure your EasyTrip account has at least ₱300 balance before entering NLEX Balintawak to avoid low-balance penalties.</p>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-surface-container border-t border-surface-variant fixed bottom-0 left-0 w-full flex justify-around items-center px-sm py-base z-50 md:hidden">
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary bg-primary-container/10 rounded-xl py-1 hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-label-caps text-label-caps font-bold">Tolls</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">emergency</span>
+<span class="font-label-caps text-label-caps">Emergency</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">explore</span>
+<span class="font-label-caps text-label-caps">Guide</span>
+</a>
+</nav>
+<script>
+        // Simple interaction script to simulate calculation
+        document.addEventListener('DOMContentLoaded', () => {
+            const calculateBtn = document.getElementById('calculateBtn');
+            const aeroAnimation = document.getElementById('aeroAnimation');
+            const resultsSection = document.getElementById('resultsSection');
+
+            calculateBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Hide button text, show animation
+                calculateBtn.style.color = 'transparent';
+                calculateBtn.classList.add('active');
+                aeroAnimation.classList.remove('hidden');
+                setTimeout(() => aeroAnimation.classList.add('visible'), 10); // trigger transition
+
+                // Simulate calculation delay
+                setTimeout(() => {
+                    // Restore button
+                    aeroAnimation.classList.remove('visible');
+                    setTimeout(() => aeroAnimation.classList.add('hidden'), 300);
+                    calculateBtn.style.color = '';
+                    calculateBtn.classList.remove('active');
+
+                    // Reveal Results
+                    resultsSection.classList.remove('opacity-50', 'pointer-events-none');
+                    resultsSection.classList.add('opacity-100');
+                    
+                    // Add a subtle flash effect to results
+                    resultsSection.style.boxShadow = '0 0 20px 2px rgba(0, 136, 255, 0.4)';
+                    setTimeout(() => {
+                        resultsSection.style.boxShadow = '';
+                    }, 500);
+
+                }, 1500);
+            });
+        });
+    </script>
+</body></html>

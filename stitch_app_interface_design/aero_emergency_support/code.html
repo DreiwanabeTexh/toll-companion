@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash - Emergency Contacts</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-primary-fixed-variant": "#004689",
+                "on-secondary-fixed-variant": "#474646",
+                "on-primary": "#003061",
+                "surface-container-lowest": "#0d0e0f",
+                "surface-container-low": "#1b1c1c",
+                "on-secondary-container": "#bab8b7",
+                "on-primary-container": "#002955",
+                "surface-variant": "#343535",
+                "on-tertiary-fixed-variant": "#474746",
+                "tertiary-container": "#929090",
+                "on-tertiary-fixed": "#1c1b1b",
+                "error": "#ffb4ab",
+                "secondary-fixed": "#e5e2e1",
+                "secondary-fixed-dim": "#c9c6c5",
+                "surface-container": "#1f2020",
+                "outline-variant": "#404754",
+                "surface-bright": "#383939",
+                "on-secondary": "#313030",
+                "tertiary": "#c8c6c5",
+                "error-container": "#93000a",
+                "surface-container-high": "#292a2a",
+                "secondary-container": "#4a4949",
+                "inverse-primary": "#005eb3",
+                "on-tertiary": "#313030",
+                "primary-container": "#3491ff",
+                "on-error": "#690005",
+                "tertiary-fixed-dim": "#c8c6c5",
+                "surface-container-highest": "#343535",
+                "inverse-on-surface": "#303031",
+                "primary-fixed": "#d5e3ff",
+                "surface-dim": "#121414",
+                "on-error-container": "#ffdad6",
+                "on-primary-fixed": "#001b3c",
+                "surface": "#121414",
+                "on-surface": "#e3e2e2",
+                "secondary": "#c9c6c5",
+                "inverse-surface": "#e3e2e2",
+                "tertiary-fixed": "#e5e2e1",
+                "background": "#121414",
+                "primary-fixed-dim": "#a8c8ff",
+                "surface-tint": "#a8c8ff",
+                "primary": "#a8c8ff",
+                "on-tertiary-container": "#2a2a2a",
+                "on-surface-variant": "#c0c6d6",
+                "on-background": "#e3e2e2",
+                "on-secondary-fixed": "#1c1b1b",
+                "outline": "#8a919f"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "xs": "4px",
+                "sm": "12px",
+                "gutter": "16px",
+                "container-margin": "24px",
+                "base": "8px",
+                "lg": "24px",
+                "md": "16px",
+                "xl": "40px",
+                "touch-target": "56px"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "display-lg": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "title-md": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom pulsating glow for emergency buttons */
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(0, 136, 255, 0.7); }
+            70% { box-shadow: 0 0 0 12px rgba(0, 136, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 136, 255, 0); }
+        }
+        
+        .btn-pulse-active {
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-lg min-h-screen overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="bg-surface border-b border-surface-variant flex items-center justify-between px-gutter h-16 w-full sticky top-0 z-50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+<img alt="Aero Mascot" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold">Hello, Driver</h1>
+</div>
+<button aria-label="Settings" class="flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95 transition-transform w-10 h-10 rounded-full">
+<span class="material-symbols-outlined text-3xl">settings</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-6 pb-[100px] px-container-margin md:px-xl max-w-3xl mx-auto flex flex-col gap-6">
+<!-- Section Header -->
+<div class="flex items-center gap-4 mt-2 mb-2">
+<div class="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden flex-shrink-0 border border-[#0088FF]/30 shadow-[0_0_15px_rgba(0,136,255,0.2)]">
+<img alt="Aero Mascot Verified Guard Badge" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background tracking-tight">Emergency</h2>
+<p class="font-body-sm text-on-surface-variant">Verified Highway Patrol &amp; Assist</p>
+</div>
+</div>
+<!-- Emergency Contacts Grid/List -->
+<div class="flex flex-col gap-gutter">
+<!-- Agency Card: TRB -->
+<article class="bg-surface-container rounded-xl p-5 flex flex-col gap-4 relative overflow-hidden group border border-surface-variant">
+<div class="absolute top-0 right-0 w-32 h-32 bg-[#0088FF]/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+<div class="flex justify-between items-start z-10">
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">TRB Command</h3>
+<p class="font-body-sm text-on-surface-variant mt-1">Toll Regulatory Board Assist</p>
+</div>
+<div class="bg-surface-container-highest border border-surface-variant rounded-full px-3 py-1 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-[#0088FF]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">VERIFIED 10/24</span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm z-10">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>24/7 Rapid Response</span>
+</div>
+<button class="btn-pulse-active w-full h-[56px] rounded-lg bg-[#0088FF] text-white flex items-center justify-center gap-3 transition-transform duration-200 active:scale-95 z-10 mt-2 shadow-lg shadow-[#0088FF]/20">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">call</span>
+<span class="font-label-caps text-label-caps tracking-widest uppercase">Call Now</span>
+</button>
+</article>
+<!-- Agency Card: SMC -->
+<article class="bg-surface-container rounded-xl p-5 flex flex-col gap-4 relative overflow-hidden group border border-surface-variant">
+<div class="absolute top-0 right-0 w-32 h-32 bg-[#0088FF]/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+<div class="flex justify-between items-start z-10">
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">SMC Tollways</h3>
+<p class="font-body-sm text-on-surface-variant mt-1">SLEX, Skyway, STAR, TPLEX</p>
+</div>
+<div class="bg-surface-container-highest border border-surface-variant rounded-full px-3 py-1 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-[#0088FF]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">VERIFIED 10/24</span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm z-10">
+<span class="material-symbols-outlined text-[18px]">map</span>
+<span>South &amp; North Expressway Sectors</span>
+</div>
+<button class="btn-pulse-active w-full h-[56px] rounded-lg bg-[#0088FF] text-white flex items-center justify-center gap-3 transition-transform duration-200 active:scale-95 z-10 mt-2 shadow-lg shadow-[#0088FF]/20">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">call</span>
+<span class="font-label-caps text-label-caps tracking-widest uppercase">Call Now</span>
+</button>
+</article>
+<!-- Agency Card: MPTC -->
+<article class="bg-surface-container rounded-xl p-5 flex flex-col gap-4 relative overflow-hidden group border border-surface-variant">
+<div class="absolute top-0 right-0 w-32 h-32 bg-[#0088FF]/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+<div class="flex justify-between items-start z-10">
+<div>
+<h3 class="font-title-md text-title-md text-on-surface">MPTC Assist</h3>
+<p class="font-body-sm text-on-surface-variant mt-1">NLEX, SCTEX, CAVITEX, CALAX</p>
+</div>
+<div class="bg-surface-container-highest border border-surface-variant rounded-full px-3 py-1 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-[#0088FF]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">VERIFIED 10/24</span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm z-10">
+<span class="material-symbols-outlined text-[18px]">minor_crash</span>
+<span>Accident &amp; Towing Dispatch</span>
+</div>
+<button class="btn-pulse-active w-full h-[56px] rounded-lg bg-[#0088FF] text-white flex items-center justify-center gap-3 transition-transform duration-200 active:scale-95 z-10 mt-2 shadow-lg shadow-[#0088FF]/20">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">call</span>
+<span class="font-label-caps text-label-caps tracking-widest uppercase">Call Now</span>
+</button>
+</article>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden bg-surface-container border-t border-surface-variant fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-sm py-base">
+<!-- Inactive: Home -->
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<!-- Inactive: Tolls -->
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]">payments</span>
+<span class="font-label-caps text-label-caps">Tolls</span>
+</a>
+<!-- Active: Emergency -->
+<a class="flex flex-col items-center justify-center text-primary bg-primary-container/10 rounded-xl py-1 px-4 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]" style="font-variation-settings: 'FILL' 1;">emergency</span>
+<span class="font-label-caps text-label-caps">Emergency</span>
+</a>
+<!-- Inactive: Guide -->
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1 text-[24px]">explore</span>
+<span class="font-label-caps text-label-caps">Guide</span>
+</a>
+</nav>
+</body></html>

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dash - Driver Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-primary-fixed-variant": "#004689",
+                "on-secondary-fixed-variant": "#474646",
+                "on-primary": "#003061",
+                "surface-container-lowest": "#0d0e0f",
+                "surface-container-low": "#1b1c1c",
+                "on-secondary-container": "#bab8b7",
+                "on-primary-container": "#002955",
+                "surface-variant": "#343535",
+                "on-tertiary-fixed-variant": "#474746",
+                "tertiary-container": "#929090",
+                "on-tertiary-fixed": "#1c1b1b",
+                "error": "#ffb4ab",
+                "secondary-fixed": "#e5e2e1",
+                "secondary-fixed-dim": "#c9c6c5",
+                "surface-container": "#1f2020",
+                "outline-variant": "#404754",
+                "surface-bright": "#383939",
+                "on-secondary": "#313030",
+                "tertiary": "#c8c6c5",
+                "error-container": "#93000a",
+                "surface-container-high": "#292a2a",
+                "secondary-container": "#4a4949",
+                "inverse-primary": "#005eb3",
+                "on-tertiary": "#313030",
+                "primary-container": "#3491ff",
+                "on-error": "#690005",
+                "tertiary-fixed-dim": "#c8c6c5",
+                "surface-container-highest": "#343535",
+                "inverse-on-surface": "#303031",
+                "primary-fixed": "#d5e3ff",
+                "surface-dim": "#121414",
+                "on-error-container": "#ffdad6",
+                "on-primary-fixed": "#001b3c",
+                "surface": "#121414",
+                "on-surface": "#e3e2e2",
+                "secondary": "#c9c6c5",
+                "inverse-surface": "#e3e2e2",
+                "tertiary-fixed": "#e5e2e1",
+                "background": "#121414",
+                "primary-fixed-dim": "#a8c8ff",
+                "surface-tint": "#a8c8ff",
+                "primary": "#a8c8ff",
+                "on-tertiary-container": "#2a2a2a",
+                "on-surface-variant": "#c0c6d6",
+                "on-background": "#e3e2e2",
+                "on-secondary-fixed": "#1c1b1b",
+                "outline": "#8a919f"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "xs": "4px",
+                "sm": "12px",
+                "gutter": "16px",
+                "container-margin": "24px",
+                "base": "8px",
+                "lg": "24px",
+                "md": "16px",
+                "xl": "40px"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "display-lg": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "title-md": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-caps": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            background-color: #0A0A0A;
+            color: theme('colors.on-surface');
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background-color: #1A1A1A;
+            border: 1px solid #2A2A2A;
+        }
+
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(0, 136, 255, 0.5); /* Electric Blue glow */
+        }
+    </style>
+</head>
+<body class="antialiased pb-[90px] md:pb-0 md:pt-[90px]">
+<!-- TopAppBar -->
+<header class="bg-[#0A0A0A] border-b border-surface-variant flex items-center justify-between px-gutter h-16 w-full fixed top-0 z-50">
+<div class="flex items-center gap-3 relative">
+<img alt="Aero Mascot" class="w-10 h-10 rounded-full object-cover border-2 border-[#0088FF]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+<div class="absolute left-12 top-0 bg-[#1A1A1A] border border-[#2A2A2A] rounded-r-lg rounded-bl-lg px-2 py-1 text-xs text-on-surface whitespace-nowrap shadow-lg z-10">
+    All clear, driver.
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold hidden sm:block ml-24">Hello, Driver</h1>
+</div>
+<div class="flex-1 max-w-md mx-4 relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
+<input class="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-full py-2 pl-10 pr-4 text-body-sm text-on-surface focus:outline-none focus:border-[#0088FF] focus:ring-1 focus:ring-[#0088FF] transition-colors" placeholder="Search routes, tolls..." type="text"/>
+</div>
+<button class="p-2 rounded-full hover:bg-surface-container-high transition-colors active:scale-95 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</header>
+<main class="max-w-7xl mx-auto px-container-margin pt-24 md:pt-8 pb-8 space-y-8">
+<!-- Mobile Search (Visible only on small screens) -->
+<div class="md:hidden relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant">search</span>
+<input class="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-full py-3 pl-10 pr-4 text-body-sm text-on-surface focus:outline-none focus:border-[#0088FF] focus:ring-1 focus:ring-[#0088FF] transition-colors" placeholder="Search..." type="text"/>
+</div>
+<!-- Balances Section -->
+<section>
+<h2 class="font-title-md text-title-md text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-[#0088FF]">account_balance_wallet</span>
+                Toll Balances
+            </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
+<!-- Autosweep Card -->
+<div class="glass-card rounded-xl p-6 relative overflow-hidden group hover:border-[#0088FF]/50 transition-colors">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[64px]">4k</span>
+</div>
+<div class="relative z-10">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1">Autosweep RFID</p>
+<p class="font-display-lg text-display-lg text-[#0088FF] mb-4">₱1,250.00</p>
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+                                Active
+                            </span>
+<button class="font-label-caps text-label-caps text-[#0088FF] hover:text-primary-fixed-dim transition-colors">Top Up</button>
+</div>
+</div>
+</div>
+<!-- EasyTrip Card with Mascot Peeking -->
+<div class="glass-card rounded-xl p-6 relative overflow-hidden group hover:border-[#0088FF]/50 transition-colors">
+<!-- Aero Peeking Background -->
+<div class="absolute -right-4 -bottom-4 w-32 h-32 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none">
+<img alt="Mascot decoration" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div class="relative z-10">
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1">EasyTrip</p>
+<p class="font-display-lg text-display-lg text-[#0088FF] mb-4">₱840.50</p>
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5"></span>
+                                Low Balance
+                            </span>
+<button class="font-label-caps text-label-caps text-[#0088FF] hover:text-primary-fixed-dim transition-colors">Top Up</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Routes -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-title-md text-title-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[#0088FF]">route</span>
+                    Recent Routes
+                </h2>
+<button class="text-on-surface-variant font-label-caps text-label-caps hover:text-[#0088FF] transition-colors">View All</button>
+</div>
+<div class="glass-card rounded-xl divide-y divide-[#2A2A2A]">
+<!-- Route Item 1 -->
+<div class="p-4 flex items-center justify-between hover:bg-surface-container-high transition-colors group cursor-pointer">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 border border-[#2A2A2A]">
+<img alt="Aero icon" class="w-6 h-6 object-contain opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-bold mb-0.5">SLEX Southbound</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+                                Today, 08:30 AM
+                            </p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-body-sm text-body-sm text-error font-semibold">-₱154.00</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant">Autosweep</p>
+</div>
+</div>
+<!-- Route Item 2 -->
+<div class="p-4 flex items-center justify-between hover:bg-surface-container-high transition-colors group cursor-pointer">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 border border-[#2A2A2A]">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-[#0088FF] transition-colors">add_road</span>
+</div>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-bold mb-0.5">NLEX Northbound</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+                                Yesterday, 18:45 PM
+                            </p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-body-sm text-body-sm text-error font-semibold">-₱210.00</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant">EasyTrip</p>
+</div>
+</div>
+<!-- Route Item 3 -->
+<div class="p-4 flex items-center justify-between hover:bg-surface-container-high transition-colors group cursor-pointer">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 border border-[#2A2A2A]">
+<img alt="Aero icon" class="w-6 h-6 object-contain opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUmIiyDFJ_57WqNqTYsY9Q097X_uLBdJIQjvaVP6ksoZYEIzlOUKyzwyMvqGDG_1GWt5C_qlZ3LHjpNTHWvxWoGO4uwa0HnYmQf6SOdFn4E10MhlASMYo14fsWCVy1f4pWsNl6WEcXgNgjvDyrHMezFoUeb7hS7gluffMZpLIMHKPvVNXwd4Cc9f0-gQkY51429D66a3FLnORJ702bsTOrDXcWlMukYo1e5-LM9OWj7zronuMCyVyz"/>
+</div>
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-bold mb-0.5">Skyway Stage 3</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+                                Oct 24, 07:15 AM
+                            </p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-body-sm text-body-sm text-error font-semibold">-₱264.00</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant">Autosweep</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-sm py-base bg-surface-container border-t border-surface-variant z-50">
+<button class="flex flex-col items-center justify-center text-[#0088FF] bg-[#0088FF]/10 rounded-xl px-4 py-1 active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-secondary-container hover:text-[#0088FF] active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-label-caps text-label-caps mt-1">Tolls</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-secondary-container hover:text-[#0088FF] active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span class="font-label-caps text-label-caps mt-1">Emergency</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-secondary-container hover:text-[#0088FF] active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-label-caps text-label-caps mt-1">Guide</span>
+</button>
+</nav>
+</body></html>

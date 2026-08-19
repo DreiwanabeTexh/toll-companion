@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "486938285341",
+    "project_id": "toll-companion-app",
+    "storage_bucket": "toll-companion-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:486938285341:android:a06b116d23fe3f84fcfdf4",
+        "android_client_info": {
+          "package_name": "com.example.tollcompanion.toll_companion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdOKrsq7X08I4S1ms2l2ytZFp8AkaJAYg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
