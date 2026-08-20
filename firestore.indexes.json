@@ -62,6 +62,23 @@
         { "fieldPath": "isActive", "order": "ASCENDING" },
         { "fieldPath": "orderIndex", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "tollPlazas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "expressway", "order": "ASCENDING" },
+        { "fieldPath": "orderIndex", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tollPlazas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

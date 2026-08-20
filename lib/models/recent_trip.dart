@@ -10,6 +10,7 @@ class RecentTrip {
   final List<String> corridors;
   final DateTime timestamp;
   final bool isFavorite;
+  final bool useSkyway;
 
   const RecentTrip({
     required this.id,
@@ -22,6 +23,7 @@ class RecentTrip {
     required this.corridors,
     required this.timestamp,
     this.isFavorite = false,
+    this.useSkyway = true,
   });
 
   RecentTrip copyWith({
@@ -35,6 +37,7 @@ class RecentTrip {
     List<String>? corridors,
     DateTime? timestamp,
     bool? isFavorite,
+    bool? useSkyway,
   }) {
     return RecentTrip(
       id: id ?? this.id,
@@ -47,6 +50,7 @@ class RecentTrip {
       corridors: corridors ?? this.corridors,
       timestamp: timestamp ?? this.timestamp,
       isFavorite: isFavorite ?? this.isFavorite,
+      useSkyway: useSkyway ?? this.useSkyway,
     );
   }
 
@@ -62,6 +66,7 @@ class RecentTrip {
       'corridors': corridors,
       'timestamp': timestamp.toIso8601String(),
       'isFavorite': isFavorite,
+      'useSkyway': useSkyway,
     };
   }
 
@@ -79,6 +84,7 @@ class RecentTrip {
           ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
           : DateTime.now(),
       isFavorite: json['isFavorite'] as bool? ?? false,
+      useSkyway: json['useSkyway'] as bool? ?? true,
     );
   }
 }

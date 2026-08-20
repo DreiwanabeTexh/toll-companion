@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../services/cache_service.dart';
 import '../theme.dart';
 
 /// Asset path for the authentic Aero bird mascot.
@@ -107,8 +108,7 @@ class _AeroAnimatedHeroMascotState extends State<AeroAnimatedHeroMascot>
         // Banking roll tilt
         final tiltAngle = math.sin(progress * 2 * math.pi) * 0.06;
 
-        final wingTransform = Matrix4.identity()
-          ..scale(wingScaleX, wingScaleY)
+        final wingTransform = Matrix4.diagonal3Values(wingScaleX, wingScaleY, 1.0)
           ..setEntry(1, 0, wingSkewY);
 
         return Transform.translate(
@@ -217,13 +217,7 @@ class AeroSpeechBubble extends StatelessWidget {
           bottomRight: Radius.circular(8),
           bottomLeft: Radius.circular(8),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: AeroGlow.subtleCardGlow,
       ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 240),
@@ -258,11 +252,13 @@ class AeroSpeechBubble extends StatelessWidget {
 class AeroHomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String driverName;
   final VoidCallback? onSettingsPressed;
+  final ValueChanged<String>? onNameChanged;
 
   const AeroHomeAppBar({
     super.key,
     this.driverName = 'Driver',
     this.onSettingsPressed,
+    this.onNameChanged,
   });
 
   String get title => 'Hello, $driverName';
@@ -293,41 +289,232 @@ class AeroHomeAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings, color: AeroColors.textSecondary, size: 24),
-          onPressed: onSettingsPressed ?? () => _showSettingsDialog(context),
+          icon: Icon(Icons.settings, color: AeroColors.textSecondary, size: 24),
+          onPressed: onSettingsPressed ?? () => showSettingsDialog(context, onNameChanged: onNameChanged),
         ),
         const SizedBox(width: 8),
       ],
     );
   }
 
-  static void _showSettingsDialog(BuildContext context) {
+  static void showSettingsDialog(BuildContext context, {ValueChanged<String>? onNameChanged}) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         backgroundColor: AeroColors.surfaceCard,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AeroColors.border),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AeroColors.border),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            AeroAvatar(size: 28, showBorder: false),
-            SizedBox(width: 8),
+            const AeroAvatar(size: 28, showBorder: false),
+            const SizedBox(width: 8),
             Text(
-              'Aero Expressway',
+              'Aero Settings',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: AeroColors.textPrimary,
               ),
             ),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Driver Profile Option
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, color: AeroColors.neonBlue, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Driver Profile',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AeroColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Change your dashboard greeting name',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AeroColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(dialogCtx).pop();
+                      _showEditNameDialog(context, onNameChanged: onNameChanged);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      backgroundColor: AeroColors.neonBlue.withValues(alpha: 0.15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Edit Name',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AeroColors.neonBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // App Theme Option (Light / Dark Mode Toggle)
+            StatefulBuilder(
+              builder: (ctx, setCardState) {
+                final isLight = AeroColors.isLight;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AeroColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AeroColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isLight ? Icons.wb_sunny_rounded : Icons.nightlight_round,
+                        color: isLight ? AeroColors.secondaryOrange : AeroColors.neonBlue,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'App Theme',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AeroColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              isLight ? 'Light Mode (Solar Lumina)' : 'Dark Mode (Nocturnal Command)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AeroColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: isLight,
+                        activeThumbColor: AeroColors.secondaryOrange,
+                        activeTrackColor: AeroColors.secondaryOrange.withValues(alpha: 0.3),
+                        inactiveThumbColor: AeroColors.neonBlue,
+                        inactiveTrackColor: AeroColors.neonBlue.withValues(alpha: 0.3),
+                        thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
+                          if (states.contains(WidgetState.selected)) {
+                            return const Icon(Icons.wb_sunny_rounded, size: 14, color: Colors.white);
+                          }
+                          return const Icon(Icons.nightlight_round, size: 14, color: Colors.white);
+                        }),
+                        onChanged: (val) async {
+                          final newMode = val ? ThemeMode.light : ThemeMode.dark;
+                          AeroColors.setThemeMode(newMode);
+                          final cacheService = CacheService();
+                          await cacheService.saveThemeMode(val ? 'light' : 'dark');
+                          setCardState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 10),
+
+            // Reset App Option (QA / Testing)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AeroColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.restart_alt_rounded, color: AeroColors.errorRed, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Reset App',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AeroColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Clear all data and restart onboarding',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AeroColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(dialogCtx).pop();
+                      _showResetAppConfirmation(context);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      backgroundColor: AeroColors.errorRed.withValues(alpha: 0.15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AeroColors.errorRed,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
             Text(
               'Philippine Expressway Driving Companion',
               style: TextStyle(
@@ -336,7 +523,7 @@ class AeroHomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 color: AeroColors.neonBlue,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'Version: 1.0.0+1\nDatabase: 08/2026 verified\nPowered by Toll Regulatory Board published matrices.',
               style: TextStyle(
@@ -349,8 +536,182 @@ class AeroHomeAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close', style: TextStyle(color: AeroColors.neonBlue)),
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text('Close', style: TextStyle(color: AeroColors.neonBlue)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showResetAppConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (confirmCtx) => AlertDialog(
+        backgroundColor: AeroColors.surfaceCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AeroColors.border),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AeroColors.errorRed, size: 24),
+            const SizedBox(width: 8),
+            Text(
+              'Reset Aero App',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AeroColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'This will clear all saved data and restart onboarding. Continue?',
+          style: TextStyle(
+            fontSize: 13,
+            color: AeroColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(confirmCtx).pop(),
+            child: Text('Cancel', style: TextStyle(color: AeroColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AeroColors.errorRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.of(confirmCtx).pop();
+              final cacheService = CacheService();
+              await cacheService.clearAll();
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  '/splash',
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text(
+              'Reset App',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showEditNameDialog(BuildContext context, {ValueChanged<String>? onNameChanged}) async {
+    final cacheService = CacheService();
+    final currentName = (await cacheService.getDriverName()) ?? 'Driver';
+    final controller = TextEditingController(text: currentName == 'Driver' ? '' : currentName);
+    final formKey = GlobalKey<FormState>();
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (editCtx) => AlertDialog(
+        backgroundColor: AeroColors.surfaceCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AeroColors.border),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.edit_outlined, color: AeroColors.neonBlue, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Edit Driver Name',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AeroColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter the name you want Aero to address you by:',
+                style: TextStyle(fontSize: 13, color: AeroColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: controller,
+                autofocus: true,
+                maxLength: 30,
+                textCapitalization: TextCapitalization.words,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AeroColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'e.g. Alex or Juan',
+                  counterStyle: TextStyle(color: AeroColors.textSecondary, fontSize: 11),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Please enter a name';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(editCtx).pop(),
+            child: Text('Cancel', style: TextStyle(color: AeroColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                final newName = controller.text.trim();
+                await cacheService.setDriverName(newName);
+                onNameChanged?.call(newName);
+                if (editCtx.mounted) Navigator.of(editCtx).pop();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AeroColors.surfaceCard,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: AeroColors.border),
+                      ),
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: AeroColors.successEmerald, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Driver name updated to $newName'),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AeroColors.neonBlue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -443,9 +804,9 @@ class _AeroTopBarState extends State<AeroTopBar> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings, color: AeroColors.textSecondary, size: 24),
+          icon: Icon(Icons.settings, color: AeroColors.textSecondary, size: 24),
           onPressed: widget.onSettingsPressed ??
-              () => AeroHomeAppBar._showSettingsDialog(context),
+              () => AeroHomeAppBar.showSettingsDialog(context),
         ),
         const SizedBox(width: 8),
       ],

@@ -88,7 +88,7 @@ class _ReportDialogState extends State<ReportDialog> {
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: AeroColors.border),
+            side: BorderSide(color: AeroColors.border),
           ),
           duration: const Duration(seconds: 3),
         ),
@@ -102,7 +102,7 @@ class _ReportDialogState extends State<ReportDialog> {
       backgroundColor: AeroColors.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AeroColors.border),
+        side: BorderSide(color: AeroColors.border),
       ),
       titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -122,7 +122,7 @@ class _ReportDialogState extends State<ReportDialog> {
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'Report Incorrect Info',
               style: TextStyle(
@@ -149,12 +149,12 @@ class _ReportDialogState extends State<ReportDialog> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 14, color: AeroColors.neonBlue),
+                  Icon(Icons.info_outline, size: 14, color: AeroColors.neonBlue),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       widget.targetName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AeroColors.primaryTint,
@@ -166,7 +166,7 @@ class _ReportDialogState extends State<ReportDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               "What's outdated or incorrect?",
               style: TextStyle(
                 fontSize: 13,
@@ -178,24 +178,24 @@ class _ReportDialogState extends State<ReportDialog> {
             TextField(
               controller: _textController,
               maxLines: 3,
-              style: const TextStyle(fontSize: 13, color: AeroColors.textPrimary),
+              style: TextStyle(fontSize: 13, color: AeroColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'e.g. Hotline changed, new fare adjustment, incorrect plaza...',
-                hintStyle: const TextStyle(fontSize: 12, color: AeroColors.textSecondary),
+                hintStyle: TextStyle(fontSize: 12, color: AeroColors.textSecondary),
                 filled: true,
                 fillColor: AeroColors.surfaceContainerLow,
                 contentPadding: const EdgeInsets.all(12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AeroColors.border),
+                  borderSide: BorderSide(color: AeroColors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AeroColors.border),
+                  borderSide: BorderSide(color: AeroColors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AeroColors.neonBlue),
+                  borderSide: BorderSide(color: AeroColors.neonBlue),
                 ),
               ),
             ),
@@ -205,7 +205,7 @@ class _ReportDialogState extends State<ReportDialog> {
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: AeroColors.textSecondary)),
+          child: Text('Cancel', style: TextStyle(color: AeroColors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _handleSubmit,

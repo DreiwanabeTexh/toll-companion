@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/checklist_item.dart';
 import '../models/route_model.dart';
 import '../services/checklist_service.dart';
+import '../theme.dart';
 
 /// Pre-Trip Checklist screen (Phase 2).
 ///
@@ -59,14 +60,20 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         widget.route ?? (ModalRoute.of(context)?.settings.arguments as RouteModel?);
 
     return Scaffold(
+      backgroundColor: AeroColors.surfaceBase,
       appBar: AppBar(
-        title: const Text('Pre-Trip Checklist'),
+        backgroundColor: AeroColors.surfaceBase,
+        title: Text(
+          'Pre-Trip Checklist',
+          style: TextStyle(color: AeroColors.textPrimary),
+        ),
+        iconTheme: IconThemeData(color: AeroColors.textPrimary),
         actions: [
           if (_checkedItemIds.isNotEmpty)
             TextButton.icon(
               onPressed: _resetChecklist,
-              icon: const Icon(Icons.restart_alt, size: 18, color: Color(0xFF0088FF)),
-              label: const Text('Reset', style: TextStyle(color: Color(0xFF0088FF))),
+              icon: Icon(Icons.restart_alt, size: 18, color: AeroColors.neonBlue),
+              label: Text('Reset', style: TextStyle(color: AeroColors.neonBlue)),
             ),
         ],
       ),
@@ -75,15 +82,15 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         initialData: ChecklistService.defaultChecklistItems,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: Color(0xFF0088FF)),
-                  SizedBox(height: 16),
+                  CircularProgressIndicator(color: AeroColors.neonBlue),
+                  const SizedBox(height: 16),
                   Text(
                     'Loading checklist items...',
-                    style: TextStyle(color: Color(0xFF8A919F)),
+                    style: TextStyle(color: AeroColors.textSecondary),
                   ),
                 ],
               ),
@@ -97,12 +104,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Color(0xFFFF5252)),
+                    const Icon(Icons.error_outline, size: 48, color: AeroColors.errorRed),
                     const SizedBox(height: 16),
                     Text(
                       'Couldn\'t load checklist. Check your connection.\n${snapshot.error}',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFE3E2E2)),
+                      style: TextStyle(color: AeroColors.textPrimary),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
@@ -125,21 +132,21 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.checklist_rtl, size: 64, color: Color(0xFF8A919F)),
+                    Icon(Icons.checklist_rtl, size: 64, color: AeroColors.textSecondary),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'No checklist items available yet',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFE3E2E2),
+                        color: AeroColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Firestore collection "checklistItems" is currently empty.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF8A919F)),
+                      style: TextStyle(color: AeroColors.textSecondary),
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton.icon(
@@ -184,35 +191,35 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 Container(
                   padding: const EdgeInsets.all(12.0),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0088FF).withValues(alpha: 0.1),
+                    color: AeroColors.neonBlue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: const Color(0xFF0088FF).withValues(alpha: 0.3),
+                      color: AeroColors.neonBlue.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.alt_route, color: Color(0xFF0088FF), size: 20),
+                      Icon(Icons.alt_route, color: AeroColors.neonBlue, size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'TRIP CONTEXT',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0088FF),
+                                color: AeroColors.neonBlue,
                                 letterSpacing: 0.5,
                               ),
                             ),
                             Text(
                               routeArg.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFFE3E2E2),
+                                color: AeroColors.textPrimary,
                               ),
                             ),
                           ],
@@ -225,96 +232,100 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               ],
 
               // Progress Overview Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              Container(
+                decoration: BoxDecoration(
+                  color: AeroColors.surfaceCard,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AeroColors.border),
+                  boxShadow: AeroGlow.subtleCardGlow,
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'TRIP READINESS',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AeroColors.textSecondary,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$completedCount of $totalItems Ready',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AeroColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isAllDone
+                                ? AeroColors.successEmerald.withValues(alpha: 0.15)
+                                : AeroColors.warningAmber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isAllDone
+                                  ? AeroColors.successEmerald.withValues(alpha: 0.4)
+                                  : AeroColors.warningAmber.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'TRIP READINESS',
+                              Icon(
+                                isAllDone
+                                    ? Icons.check_circle
+                                    : Icons.pending_actions,
+                                size: 14,
+                                color: isAllDone
+                                    ? AeroColors.successEmerald
+                                    : AeroColors.warningAmber,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isAllDone ? 'Ready to Drive' : 'In Progress',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF8A919F),
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$completedCount of $totalItems Ready',
-                                style: const TextStyle(
-                                  fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFFE3E2E2),
+                                  color: isAllDone
+                                      ? AeroColors.successEmerald
+                                      : AeroColors.warningAmber,
                                 ),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isAllDone
-                                  ? const Color(0xFF00CC88).withValues(alpha: 0.15)
-                                  : const Color(0xFFFFA000).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isAllDone
-                                    ? const Color(0xFF00CC88).withValues(alpha: 0.4)
-                                    : const Color(0xFFFFA000).withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isAllDone
-                                      ? Icons.check_circle
-                                      : Icons.pending_actions,
-                                  size: 14,
-                                  color: isAllDone
-                                      ? const Color(0xFF00CC88)
-                                      : const Color(0xFFFFA000),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isAllDone ? 'Ready to Drive' : 'In Progress',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isAllDone
-                                        ? const Color(0xFF00CC88)
-                                        : const Color(0xFFFFA000),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 8,
-                          backgroundColor: const Color(0xFF2A2A2A),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            isAllDone
-                                ? const Color(0xFF00CC88)
-                                : const Color(0xFF0088FF),
-                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: AeroColors.surfaceContainerLow,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isAllDone
+                              ? AeroColors.successEmerald
+                              : AeroColors.neonBlue,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -350,7 +361,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
               Center(
                 child: Text(
                   'Checklist state is saved locally for this active session.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: AeroColors.textSecondary),
                 ),
               ),
             ],
@@ -376,14 +387,14 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 6.0),
             child: Row(
               children: [
-                Icon(icon, size: 14, color: const Color(0xFF0088FF)),
+                Icon(icon, size: 14, color: AeroColors.neonBlue),
                 const SizedBox(width: 6),
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF8A919F),
+                    color: AeroColors.textSecondary,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -399,16 +410,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Widget _buildChecklistCard(ChecklistItem item) {
     final isChecked = _checkedItemIds.contains(item.id);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8.0),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
+        border: Border.all(
           color: isChecked
-              ? const Color(0xFF00CC88).withValues(alpha: 0.4)
-              : const Color(0xFF2A2A2A),
+              ? AeroColors.successEmerald.withValues(alpha: 0.4)
+              : AeroColors.border,
           width: 1,
         ),
+        boxShadow: AeroGlow.subtleCardGlow,
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -418,25 +431,25 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Custom Nocturnal Checkbox
+              // Custom Checkbox
               Container(
                 width: 24,
                 height: 24,
                 margin: const EdgeInsets.only(top: 2),
                 decoration: BoxDecoration(
                   color: isChecked
-                      ? const Color(0xFF00CC88)
-                      : const Color(0xFF141414),
+                      ? AeroColors.successEmerald
+                      : AeroColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isChecked
-                        ? const Color(0xFF00CC88)
-                        : const Color(0xFF8A919F),
+                        ? AeroColors.successEmerald
+                        : AeroColors.border,
                     width: 1.5,
                   ),
                 ),
                 child: isChecked
-                    ? const Icon(Icons.check, size: 16, color: Color(0xFF0A0A0A))
+                    ? const Icon(Icons.check, size: 16, color: Colors.white)
                     : null,
               ),
               const SizedBox(width: 14),
@@ -453,8 +466,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: isChecked
-                                  ? const Color(0xFF8A919F)
-                                  : const Color(0xFFE3E2E2),
+                                  ? AeroColors.textSecondary
+                                  : AeroColors.textPrimary,
                               decoration: isChecked
                                   ? TextDecoration.lineThrough
                                   : null,
@@ -468,18 +481,25 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: item.operator == 'autosweep'
-                                  ? const Color(0xFF424242)
-                                  : const Color(0xFF1565C0),
+                                  ? AeroColors.successEmerald.withValues(alpha: 0.15)
+                                  : AeroColors.neonBlue.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: item.operator == 'autosweep'
+                                    ? AeroColors.successEmerald.withValues(alpha: 0.4)
+                                    : AeroColors.neonBlue.withValues(alpha: 0.4),
+                              ),
                             ),
                             child: Text(
                               item.operator == 'autosweep'
                                   ? 'AUTOSWEEP'
                                   : 'EASYTRIP',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: item.operator == 'autosweep'
+                                    ? AeroColors.successEmerald
+                                    : AeroColors.neonBlue,
                               ),
                             ),
                           ),
@@ -492,8 +512,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         color: isChecked
-                            ? const Color(0xFF4A4A4A)
-                            : const Color(0xFF8A919F),
+                            ? AeroColors.textMuted
+                            : AeroColors.textSecondary,
                         height: 1.3,
                       ),
                     ),

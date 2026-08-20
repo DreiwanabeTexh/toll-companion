@@ -79,7 +79,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     return Scaffold(
       backgroundColor: AeroColors.surfaceBase,
       // Tier 1 Header with clean no-ring avatar and rotating speech bubble
-      appBar: const AeroTopBar(
+      appBar: AeroTopBar(
         phrases: AeroTopBar.emergencyPhrases,
       ),
       body: StreamBuilder<List<EmergencyContact>>(
@@ -87,7 +87,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         initialData: _initialContacts,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -124,7 +124,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                         Text(
                           'Couldn\'t load emergency contacts. Check your connection.\n${snapshot.error}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: AeroColors.textPrimary),
+                          style: TextStyle(color: AeroColors.textPrimary),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -158,10 +158,10 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.contact_phone,
+                        Icon(Icons.contact_phone,
                             size: 64, color: AeroColors.textSecondary),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'No emergency contacts available yet',
                           style: TextStyle(
                             fontSize: 18,
@@ -170,7 +170,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Firestore collection "emergencyContacts" is currently empty.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AeroColors.textSecondary),
@@ -218,7 +218,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
       children: [
         // Dedicated Hero Space: Large Mascot Illustration alongside Page Heading
-        const AeroHeroHeaderRow(
+        AeroHeroHeaderRow(
           title: 'Emergency',
           subtitle: 'Verified Highway Patrol & Assist',
           mascotSize: 84,
@@ -239,7 +239,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         const SizedBox(height: 8),
 
         // Bottom Disclaimer
-        const Center(
+        Center(
           child: Text(
             'Tap "CALL NOW" to launch your device dialer without auto-dialing.',
             style: TextStyle(fontSize: 11, color: AeroColors.textSecondary),
@@ -253,7 +253,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   Widget _buildContactCard(EmergencyContact contact) {
     return Container(
       decoration: BoxDecoration(
-        color: AeroColors.surfaceContainer,
+        color: AeroColors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AeroColors.border),
         boxShadow: AeroGlow.subtleCardGlow,
@@ -294,11 +294,11 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           // Hotline Number Display
           Row(
             children: [
-              const Icon(Icons.phone, size: 16, color: AeroColors.neonBlue),
+              Icon(Icons.phone, size: 16, color: AeroColors.neonBlue),
               const SizedBox(width: 6),
               Text(
                 contact.displayNumber,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: AeroColors.neonBlue,
@@ -314,12 +314,12 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.map, size: 15, color: AeroColors.textSecondary),
+              Icon(Icons.map, size: 15, color: AeroColors.textSecondary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   contact.coverageArea,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AeroColors.textMuted,
@@ -335,7 +335,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
                   Icon(Icons.schedule, size: 14, color: AeroColors.textSecondary),
                   SizedBox(width: 6),
@@ -361,7 +361,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     'coverageArea': contact.coverageArea,
                   },
                 ),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -427,11 +427,11 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.verified, size: 13, color: AeroColors.neonBlue),
+            Icon(Icons.verified, size: 13, color: AeroColors.neonBlue),
             const SizedBox(width: 4),
             Text(
               'VERIFIED ${_formatDate(contact.lastVerified!)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: AeroColors.textMuted,

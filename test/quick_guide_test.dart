@@ -196,6 +196,9 @@ void main() {
       expect(find.text('Stay in lane. Await teller assistance.'), findsOneWidget);
       expect(find.text('#rfid'), findsOneWidget);
       expect(find.text('#toll'), findsOneWidget);
+      expect(find.textContaining('Updated:'), findsOneWidget);
+      expect(find.textContaining('TODO'), findsNothing);
+      expect(find.textContaining('Placeholder guidance'), findsNothing);
 
       // Tap back button
       await tester.pageBack();

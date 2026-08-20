@@ -203,10 +203,18 @@ Phase 6 — v2
 
 ---
 
-## Explicit Non-Goals (Current — Phase 4)
+## How to Update Toll Rates After a TRB Announcement
 
-- No user accounts or authentication yet — Phase 5 is tentative and not committed
-- No state management libraries or extra dependencies beyond what's listed, without discussion
-- No crowdsourced or unverified emergency contact data
-- No fuel comparison, smart suggestions, or Tier 2 features until Phase 6
-- No full real-data toll plaza network yet — Phase 4's routing engine ships with placeholder/sample network data; full verified nationwide data population is a separate, dedicated Phase 6 task
+All manually editable toll fare data in Aero is stored in a single, clearly organized file:
+👉 [`lib/data/toll_rates_data.dart`](file:///c:/Users/USER/project/Toll/lib/data/toll_rates_data.dart)
+
+### Quick Update Steps:
+1. Open [`lib/data/toll_rates_data.dart`](file:///c:/Users/USER/project/Toll/lib/data/toll_rates_data.dart).
+2. Locate the expressway section (e.g. `STAR`, `SLEX`, `SKYWAY`, `NLEX`, `CALAX`, `SCTEX`, `TPLEX`, `CAVITEX`, `MCX`, `NAIAX`, etc.).
+3. Update the fare values for the entry/exit combination:
+   - `fareClass1`: Class 1 rate (cars, SUVs, motorcycles ≥400cc)
+   - `fareClass2`: Class 2 rate (buses, 2-axle trucks)
+   - `fareClass3`: Class 3 rate (heavy trucks, trailers)
+4. Update `ratesLastUpdated` (or `effectiveFrom`) to the date of the change or announcement (e.g. `DateTime(2026, 8, 20)`).
+   > **Note:** Whenever you change any fare value, always update the `ratesLastUpdated` date for that rule so the app accurately reflects the latest update date in the calculator UI.
+5. Save the file. Flutter hot reloads automatically, and all route calculations will immediately use the new rates!

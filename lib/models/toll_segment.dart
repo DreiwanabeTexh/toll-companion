@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Represents a single toll segment between an entry and exit toll plaza.
+/// Represents a single directed road link between an entry and exit toll plaza.
 ///
-/// Follows schema defined in data-model.md:
-/// Collection: `tollSegments`
+/// Refactored to represent pure physical road topology, distance, and directionality.
+/// Pricing is now determined by [TollChargeRule]s rather than summing individual road segments.
 class TollSegment {
   final String id;
   final String expressway;
@@ -11,15 +11,20 @@ class TollSegment {
   final String operator; // "autosweep" or "easytrip"
   final String entryPoint;
   final String exitPoint;
-  final double fareClass1;
-  final double fareClass2;
-  final double fareClass3;
   final double? distanceKm;
   final String direction; // "northbound", "southbound", or "both"
   final bool isActive;
   final DateTime lastUpdated;
-  final DateTime? lastVerified; // Nullable trust field
+  final DateTime? lastVerified;
   final String? notes;
+
+  /// Legacy segment fares (deprecated). Maintained for Firestore migration compatibility.
+  @Deprecated('Toll pricing is governed by TollChargeRule. Legacy segment fare fields are ignored for pricing.')
+  final double fareClass1;
+  @Deprecated('Toll pricing is governed by TollChargeRule. Legacy segment fare fields are ignored for pricing.')
+  final double fareClass2;
+  @Deprecated('Toll pricing is governed by TollChargeRule. Legacy segment fare fields are ignored for pricing.')
+  final double fareClass3;
 
   const TollSegment({
     required this.id,
@@ -28,9 +33,9 @@ class TollSegment {
     required this.operator,
     required this.entryPoint,
     required this.exitPoint,
-    required this.fareClass1,
-    required this.fareClass2,
-    required this.fareClass3,
+    this.fareClass1 = 0.0,
+    this.fareClass2 = 0.0,
+    this.fareClass3 = 0.0,
     this.distanceKm,
     this.direction = 'both',
     this.isActive = true,
@@ -41,14 +46,10 @@ class TollSegment {
 
   bool get isVerified => lastVerified != null;
 
-  /// Returns explicit distance or fallback based on standard segment density (~6.5 km).
+  /// Returns known physical distance in kilometers, or safe default routing weight (5.0 km).
   double get effectiveDistanceKm {
     if (distanceKm != null && distanceKm! > 0) return distanceKm!;
-    // Fallback: approximate based on Class 1 fare (roughly ₱3.50/km on PH expressways)
-    if (fareClass1 > 0) {
-      return (fareClass1 / 3.6).clamp(2.5, 45.0);
-    }
-    return 4.0;
+    return 5.0; // Safe default physical routing weight
   }
 
   factory TollSegment.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {

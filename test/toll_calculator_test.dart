@@ -237,5 +237,89 @@ void main() {
 
       expect(find.text('TOTAL ESTIMATED TRIP COST'), findsOneWidget);
     });
+
+    testWidgets('TollCalculatorScreen Skyway toggle switches between Elevated and At-Grade route',
+        (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final tollService = TollService();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TollCalculatorScreen(
+            tollService: tollService,
+            initialOriginPlazaId: 'slex_calamba',
+            initialDestinationPlazaId: 'nlex_balintawak',
+            initialVehicleClass: 1,
+            initialUseSkyway: true,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify Skyway toggle is visible and set to Elevated route
+      expect(find.text('Via Skyway (Elevated)'), findsOneWidget);
+      expect(find.text('VIA SKYWAY'), findsOneWidget);
+
+      // Tap Switch to toggle off Skyway
+      await tester.tap(find.byType(Switch).first);
+      await tester.pumpAndSettle();
+
+      // Verify toggle switched to SLEX At-Grade route
+      expect(find.text('SLEX At-Grade (Surface)'), findsOneWidget);
+      expect(find.text('AT-GRADE'), findsOneWidget);
+    });
+  });
+
+  group('Skyway vs SLEX At-Grade Routing Engine Unit Tests', () {
+    final tollService = TollService();
+
+    test('findPathSync with useSkyway=true traverses elevated Skyway Stages 1-3', () {
+      final result = tollService.calculateExitToExitFareSync(
+        originPlazaId: 'slex_calamba',
+        destinationPlazaId: 'nlex_balintawak',
+        vehicleClass: 1,
+        useSkyway: true,
+      );
+
+      final expressways = result.segments.map((s) => s.expressway).toSet();
+      expect(expressways.contains('SKYWAY'), isTrue);
+      expect(expressways.contains('SLEX'), isTrue);
+
+      // Skyway elevated route includes SLEX (137) + Skyway Stages 1&2 (164) + Skyway Stage 3 (264) = 565.00
+      expect(result.totalFare, 565.0);
+    });
+
+    test('findPathSync with useSkyway=false routes via SLEX at-grade avoiding Skyway', () {
+      final result = tollService.calculateExitToExitFareSync(
+        originPlazaId: 'slex_calamba',
+        destinationPlazaId: 'nlex_balintawak',
+        vehicleClass: 1,
+        useSkyway: false,
+      );
+
+      final expressways = result.segments.map((s) => s.expressway).toSet();
+      expect(expressways.contains('SKYWAY'), isFalse);
+      expect(expressways.contains('SLEX'), isTrue);
+
+      // At-grade route avoids Skyway elevated toll (₱137 + ₱45 = ₱182.00)
+      expect(result.totalFare, 182.0);
+    });
+
+    test('findPathSync with Lipa to Mindanao Ave with useSkyway=true returns exact regulatory fare 735', () {
+      final result = tollService.calculateExitToExitFareSync(
+        originPlazaId: 'star_lipa',
+        destinationPlazaId: 'nlex_mindanao_ave',
+        vehicleClass: 1,
+        useSkyway: true,
+      );
+
+      expect(result.fareByOperator['autosweep'], 666.0); // STAR 64 + SLEX 174 + Skyway 428 = 666
+      expect(result.fareByOperator['easytrip'], 69.0);   // NLEX 69
+      expect(result.totalFare, 735.0);
+    });
   });
 }

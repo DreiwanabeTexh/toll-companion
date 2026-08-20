@@ -11,6 +11,7 @@ import 'package:toll_companion/services/contacts_service.dart';
 import 'package:toll_companion/services/guide_service.dart';
 import 'package:toll_companion/services/toll_service.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toll_companion/models/toll_plaza.dart';
 import 'package:toll_companion/widgets/aero_mascot.dart';
 
@@ -40,6 +41,8 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
+    SharedPreferences.setMockInitialValues({});
+
     await tester.pumpWidget(
       MaterialApp(
         home: MainNavigationScaffold(
@@ -49,23 +52,24 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
 
     // Verify Home Top App Bar
     expect(find.text('Hello, Driver'), findsOneWidget);
 
     // Verify Dashboard Sections
+    expect(find.text('AERO CO-PILOT READY'), findsOneWidget);
+    expect(find.text('Expressway Radar Active'), findsOneWidget);
     expect(find.text('Toll Balances'), findsOneWidget);
-    expect(find.text('LOCAL TRACKING'), findsOneWidget);
     expect(find.text('AUTOSWEEP RFID'), findsOneWidget);
     expect(find.text('EASYTRIP RFID'), findsOneWidget);
     expect(find.text('Recent Routes'), findsOneWidget);
+    expect(find.text('No routes calculated yet'), findsOneWidget);
 
     // Verify Bottom Navigation Bar Tabs
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Tolls'), findsOneWidget);
-    expect(find.text('Emergency'), findsOneWidget);
+    expect(find.text('Emergency'), findsWidgets);
     expect(find.text('Guide'), findsOneWidget);
 
     // Switch to Tolls Tab

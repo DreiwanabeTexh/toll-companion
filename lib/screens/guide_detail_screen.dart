@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/guide_entry.dart';
+import '../theme.dart';
 
 /// Detail screen displaying full guidance content for a specific expressway situation.
 class GuideDetailScreen extends StatelessWidget {
@@ -21,8 +22,14 @@ class GuideDetailScreen extends StatelessWidget {
 
     if (effectiveEntry == null) {
       return Scaffold(
+        backgroundColor: AeroColors.surfaceBase,
         appBar: AppBar(
-          title: const Text('Guide Details'),
+          backgroundColor: AeroColors.surfaceBase,
+          title: Text(
+            'Guide Details',
+            style: TextStyle(color: AeroColors.textPrimary),
+          ),
+          iconTheme: IconThemeData(color: AeroColors.textPrimary),
         ),
         body: Center(
           child: Padding(
@@ -30,14 +37,14 @@ class GuideDetailScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.help_outline, size: 64, color: Color(0xFF8A919F)),
+                Icon(Icons.help_outline, size: 64, color: AeroColors.textSecondary),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'No Guide Selected',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFE3E2E2),
+                    color: AeroColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -46,7 +53,7 @@ class GuideDetailScreen extends StatelessWidget {
                       ? 'Guide entry "$entryId" could not be loaded.'
                       : 'Please select a guide topic from the Quick Guide list.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF8A919F)),
+                  style: TextStyle(color: AeroColors.textSecondary),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
@@ -64,8 +71,15 @@ class GuideDetailScreen extends StatelessWidget {
     final categoryColor = _getCategoryColor(effectiveEntry.category);
 
     return Scaffold(
+      backgroundColor: AeroColors.surfaceBase,
       appBar: AppBar(
-        title: Text(effectiveEntry.shortTitle),
+        backgroundColor: AeroColors.surfaceBase,
+        elevation: 0,
+        title: Text(
+          effectiveEntry.shortTitle,
+          style: TextStyle(color: AeroColors.textPrimary),
+        ),
+        iconTheme: IconThemeData(color: AeroColors.textPrimary),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -73,86 +87,94 @@ class GuideDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Category Badge & Title Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: categoryColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: categoryColor.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        _formatCategory(effectiveEntry.category).toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: categoryColor,
-                          letterSpacing: 0.5,
-                        ),
+            Container(
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AeroColors.border),
+                boxShadow: AeroGlow.subtleCardGlow,
+              ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: categoryColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: categoryColor.withValues(alpha: 0.4),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      effectiveEntry.title,
-                      style: const TextStyle(
-                        fontSize: 18,
+                    child: Text(
+                      _formatCategory(effectiveEntry.category).toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFE3E2E2),
-                        height: 1.3,
+                        color: categoryColor,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    effectiveEntry.title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AeroColors.textPrimary,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
 
             // Guidance Content Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.directions,
-                          size: 20,
-                          color: Color(0xFF0088FF),
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Recommended Actions',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE3E2E2),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20, color: Color(0xFF2A2A2A)),
-                    Text(
-                      effectiveEntry.content,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFFE3E2E2),
-                        height: 1.6,
+            Container(
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AeroColors.border),
+                boxShadow: AeroGlow.subtleCardGlow,
+              ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.directions,
+                        size: 20,
+                        color: AeroColors.neonBlue,
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Recommended Actions',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AeroColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Divider(height: 20, color: AeroColors.border),
+                  Text(
+                    effectiveEntry.content,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AeroColors.textPrimary,
+                      height: 1.6,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
@@ -169,15 +191,15 @@ class GuideDetailScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF141414),
+                        color: AeroColors.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF2A2A2A)),
+                        border: Border.all(color: AeroColors.border),
                       ),
                       child: Text(
                         '#$tag',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF8A919F),
+                          color: AeroColors.textSecondary,
                         ),
                       ),
                     );
@@ -188,22 +210,21 @@ class GuideDetailScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // Data freshness & disclaimer note
+            // Data freshness note
             Center(
-              child: Column(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.info_outline,
-                          size: 14, color: Color(0xFF8A919F)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Updated: ${_formatDate(effectiveEntry.lastUpdated)} • // TODO(data): Placeholder guidance',
-                        style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF8A919F)),
-                      ),
-                    ],
+                  Icon(Icons.schedule,
+                      size: 13, color: AeroColors.textSecondary),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Updated: ${_formatDate(effectiveEntry.lastUpdated)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AeroColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -217,15 +238,15 @@ class GuideDetailScreen extends StatelessWidget {
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'rfid':
-        return const Color(0xFFFFA000); // Amber
+        return AeroColors.warningAmber;
       case 'breakdown':
-        return const Color(0xFFFF5252); // Red
+        return AeroColors.errorRed;
       case 'navigation':
-        return const Color(0xFF0088FF); // Blue
+        return AeroColors.neonBlue;
       case 'safety':
-        return const Color(0xFF00CC88); // Green
+        return AeroColors.successEmerald;
       default:
-        return const Color(0xFF0088FF);
+        return AeroColors.neonBlue;
     }
   }
 

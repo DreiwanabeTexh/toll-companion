@@ -1,17 +1,36 @@
 import '../models/toll_plaza.dart';
 import '../models/toll_segment.dart';
+import '../models/toll_charge_rule.dart';
+import '../models/toll_charge_breakdown.dart';
 import '../models/route_model.dart';
 import '../models/route_result.dart';
+import '../models/route_calculation_debug.dart';
+import '../data/toll_rates_data.dart';
 import 'firestore_service.dart';
 import 'cache_service.dart';
 
+/// Internal graph edge representation for Dijkstra routing
+class _DijkstraEdge {
+  final String targetPlazaId;
+  final double weightKm;
+  final TollSegment segment;
+
+  const _DijkstraEdge({
+    required this.targetPlazaId,
+    required this.weightKm,
+    required this.segment,
+  });
+}
+
 /// Data and routing engine service for the Toll Calculator.
 ///
-/// Supports:
-/// 1. Arbitrary exit-to-exit pathfinding across multi-expressway networks and
-///    dual-operator boundaries (Autosweep vs Easytrip).
-/// 2. Strict sum-of-subtotals fare computation per RFID operator.
-/// 3. Offline resilience with local SharedPreferences caching and embedded fallback catalog.
+/// Implements:
+/// 1. Physical navigation graph traversal using Dijkstra's shortest-path algorithm (weighted by distance).
+/// 2. Toll charging engine based on Philippine TRB toll collection rules:
+///    - Closed-system exact Origin-Destination (OD) fare lookups (STAR, SLEX, CALAX, SCTEX, TPLEX)
+///    - Open-system flat barrier charges and deduplication (NLEX Open, Skyway 1-3, MCX, NAIAX, NLEX-C)
+/// 3. Strict per-operator partitioning (Autosweep vs Easytrip).
+/// 4. Offline resilience with local SharedPreferences caching and embedded fallback catalog.
 class TollService {
   final FirestoreService? _customFirestoreService;
   final CacheService? _customCacheService;
@@ -29,11 +48,10 @@ class TollService {
       _customCacheService ?? CacheService();
 
   // ===========================================================================
-  // PLAZAS & EXIT-TO-EXIT ROUTING ENGINE
+  // PLAZAS & TOLL RULES STREAM & CACHE GETTERS
   // ===========================================================================
 
   /// Fetches all active toll plazas from Firestore.
-  /// Automatically writes successful reads to local cache.
   Stream<List<TollPlaza>> getActivePlazas() {
     try {
       return _firestoreService.tollPlazasRef
@@ -52,7 +70,6 @@ class TollService {
   }
 
   /// Retrieves locally cached toll plazas if offline.
-  /// Falls back to default plazas if cache is empty.
   Future<List<TollPlaza>> getCachedPlazas() async {
     final cached = await _cacheService.getPlazas();
     if (cached != null && cached.isNotEmpty) {
@@ -61,12 +78,45 @@ class TollService {
     return defaultPlazas;
   }
 
-  /// Synchronously finds the optimal sequence of [TollSegment]s connecting [originPlazaId] to [destinationPlazaId].
+  /// Fetches active toll charge rules from Firestore.
+  Stream<List<TollChargeRule>> getActiveTollRules() {
+    try {
+      return _firestoreService.tollChargeRulesRef
+          .where('isActive', isEqualTo: true)
+          .snapshots()
+          .map((snapshot) {
+        final rules = snapshot.docs.map((doc) => doc.data()).toList();
+        if (rules.isNotEmpty) {
+          _cacheService.saveTollRules(rules);
+        }
+        return rules.isNotEmpty ? rules : defaultTollRules;
+      }).handleError((_) => defaultTollRules);
+    } catch (_) {
+      return Stream.value(defaultTollRules);
+    }
+  }
+
+  /// Retrieves locally cached toll charge rules if offline.
+  Future<List<TollChargeRule>> getCachedTollRules() async {
+    final cached = await _cacheService.getTollRules();
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
+    return defaultTollRules;
+  }
+
+  // ===========================================================================
+  // 1. DIJKSTRA-BASED PHYSICAL ROAD GRAPH NAVIGATION
+  // ===========================================================================
+
+  /// Synchronously finds the optimal physical road path of [TollSegment]s from
+  /// [originPlazaId] to [destinationPlazaId] using Dijkstra's shortest-path algorithm.
   List<TollSegment> findPathSync(
     String originPlazaId,
     String destinationPlazaId, {
     List<TollPlaza>? plazas,
     List<TollSegment>? segments,
+    bool useSkyway = true,
   }) {
     if (originPlazaId == destinationPlazaId) {
       return [];
@@ -81,17 +131,30 @@ class TollService {
       return [];
     }
 
-    // Build directed adjacency graph
-    final Map<String, List<_GraphEdge>> adj = {};
+    final originIsSkyway = originPlazaId.startsWith('skyway_');
+    final destIsSkyway = destinationPlazaId.startsWith('skyway_');
+    final originIsAtGrade = originPlazaId == 'slex_magallanes' || originPlazaId.contains('atgrade');
+    final destIsAtGrade = destinationPlazaId == 'slex_magallanes' || destinationPlazaId.contains('atgrade');
+    final allowSkyway = useSkyway || originIsSkyway || destIsSkyway;
+
+    // Build directed weighted adjacency graph
+    final Map<String, List<_DijkstraEdge>> adj = {};
     for (final p in allPlazas) {
       adj[p.id] = [];
     }
 
     for (final seg in allSegments) {
+      // If user opted out of Skyway and neither origin nor destination is on Skyway, exclude Skyway segments
+      if (!allowSkyway && seg.expressway == 'SKYWAY') {
+        continue;
+      }
+
       final u = seg.entryPoint;
       final v = seg.exitPoint;
+      final weight = seg.effectiveDistanceKm;
+
       if (adj.containsKey(u) && adj.containsKey(v)) {
-        adj[u]!.add(_GraphEdge(targetPlazaId: v, segment: seg));
+        adj[u]!.add(_DijkstraEdge(targetPlazaId: v, weightKm: weight, segment: seg));
         if (seg.direction == 'both') {
           final reverseSeg = TollSegment(
             id: '${seg.id}_rev',
@@ -100,23 +163,34 @@ class TollService {
             operator: seg.operator,
             entryPoint: v,
             exitPoint: u,
-            fareClass1: seg.fareClass1,
-            fareClass2: seg.fareClass2,
-            fareClass3: seg.fareClass3,
+            distanceKm: seg.distanceKm,
             direction: 'both',
             isActive: seg.isActive,
             lastUpdated: seg.lastUpdated,
             lastVerified: seg.lastVerified,
             notes: seg.notes,
           );
-          adj[v]!.add(_GraphEdge(targetPlazaId: u, segment: reverseSeg));
+          adj[v]!.add(_DijkstraEdge(targetPlazaId: u, weightKm: weight, segment: reverseSeg));
         }
       }
     }
 
-    // Add zero-cost interchange connectors between connecting plazas
+    // Add zero-distance interchange connectors between connecting plazas
     for (final p in allPlazas) {
       for (final targetId in p.connectsTo) {
+        // If user opted out of Skyway, exclude transfers into or out of Skyway
+        if (!allowSkyway && (p.id.startsWith('skyway_') || targetId.startsWith('skyway_'))) {
+          continue;
+        }
+
+        // When Skyway is enabled, do not shortcut elevated corridor via surface SLEX-NLEX connector
+        if (allowSkyway && !originIsAtGrade && !destIsAtGrade) {
+          if ((p.id == 'slex_magallanes' && targetId == 'nlex_balintawak') ||
+              (p.id == 'nlex_balintawak' && targetId == 'slex_magallanes')) {
+            continue;
+          }
+        }
+
         if (adj.containsKey(p.id) && adj.containsKey(targetId)) {
           final targetPlaza = plazaMap[targetId];
           final connectorSeg = TollSegment(
@@ -126,43 +200,52 @@ class TollService {
             operator: targetPlaza?.operator ?? p.operator,
             entryPoint: p.id,
             exitPoint: targetId,
-            fareClass1: 0.0,
-            fareClass2: 0.0,
-            fareClass3: 0.0,
+            distanceKm: 0.1, // Zero-cost connector
             direction: 'both',
             isActive: true,
             lastUpdated: DateTime(2026, 8, 19),
             lastVerified: DateTime(2026, 8, 19),
             notes: 'Transfer between ${p.expressway} and ${targetPlaza?.expressway}',
           );
-          adj[p.id]!.add(_GraphEdge(targetPlazaId: targetId, segment: connectorSeg));
+          adj[p.id]!.add(_DijkstraEdge(targetPlazaId: targetId, weightKm: 0.1, segment: connectorSeg));
         }
       }
     }
 
-    // BFS shortest path search
-    final queue = <String>[originPlazaId];
-    final visited = <String>{originPlazaId};
-    final parentEdge = <String, _GraphEdge>{};
+    // Dijkstra's Shortest Path Algorithm
+    final Map<String, double> dist = {originPlazaId: 0.0};
+    final Map<String, _DijkstraEdge> parentEdge = {};
+    final Set<String> settled = {};
+    final List<String> queue = [originPlazaId];
 
-    bool found = false;
     while (queue.isNotEmpty) {
+      // Find unvisited node with minimum distance
+      queue.sort((a, b) => (dist[a] ?? double.infinity).compareTo(dist[b] ?? double.infinity));
       final current = queue.removeAt(0);
+
+      if (settled.contains(current)) continue;
+      settled.add(current);
+
       if (current == destinationPlazaId) {
-        found = true;
         break;
       }
 
+      final currentDist = dist[current] ?? double.infinity;
       for (final edge in adj[current] ?? []) {
-        if (!visited.contains(edge.targetPlazaId)) {
-          visited.add(edge.targetPlazaId);
+        if (settled.contains(edge.targetPlazaId)) continue;
+
+        final newDist = currentDist + edge.weightKm;
+        if (newDist < (dist[edge.targetPlazaId] ?? double.infinity)) {
+          dist[edge.targetPlazaId] = newDist;
           parentEdge[edge.targetPlazaId] = edge;
-          queue.add(edge.targetPlazaId);
+          if (!queue.contains(edge.targetPlazaId)) {
+            queue.add(edge.targetPlazaId);
+          }
         }
       }
     }
 
-    if (!found) {
+    if (!dist.containsKey(destinationPlazaId)) {
       return [];
     }
 
@@ -170,8 +253,9 @@ class TollService {
     final List<TollSegment> path = [];
     String curr = destinationPlazaId;
     while (curr != originPlazaId) {
-      final edge = parentEdge[curr]!;
-      if (edge.segment.fareClass1 > 0 || !edge.segment.id.startsWith('interchange_')) {
+      final edge = parentEdge[curr];
+      if (edge == null) break;
+      if (!edge.segment.id.startsWith('interchange_')) {
         path.insert(0, edge.segment);
       }
       curr = edge.segment.entryPoint;
@@ -180,13 +264,863 @@ class TollService {
     return path;
   }
 
-  /// Finds the optimal sequence of [TollSegment]s connecting [originPlazaId] to [destinationPlazaId].
+  /// Finds the optimal physical road path connecting [originPlazaId] to [destinationPlazaId].
   Future<List<TollSegment>> findPathBetweenPlazas(
     String originPlazaId,
-    String destinationPlazaId,
-  ) async {
+    String destinationPlazaId, {
+    bool useSkyway = true,
+  }) async {
     final allPlazas = await getCachedPlazas();
-    return findPathSync(originPlazaId, destinationPlazaId, plazas: allPlazas);
+    return findPathSync(
+      originPlazaId,
+      destinationPlazaId,
+      plazas: allPlazas,
+      useSkyway: useSkyway,
+    );
+  }
+
+  // ===========================================================================
+  // 2. TOLL CHARGE CALCULATION ENGINE (PHILIPPINE TRB RULES)
+  // ===========================================================================
+
+  /// Synchronously calculates the itemized toll charges and fare breakdown for a resolved route.
+  RouteResult calculateRouteChargesSync({
+    required List<TollSegment> segments,
+    required String originPlazaId,
+    required String destinationPlazaId,
+    int vehicleClass = 1,
+    List<TollPlaza>? plazas,
+    List<TollChargeRule>? rules,
+    bool useSkyway = true,
+  }) {
+    // 0. Same origin and destination check
+    if (originPlazaId == destinationPlazaId) {
+      return RouteResult.calculate(
+        segments: [],
+        tollCharges: [],
+        orderedPlazaIds: [originPlazaId],
+        warnings: [],
+        vehicleClass: vehicleClass,
+        debugInfo: RouteCalculationDebug(
+          chosenOrderedPlazaPath: [originPlazaId],
+          excludedPathAlternatives: [],
+          matchedRuleIds: [],
+          consideredNotChargedRules: [],
+          operatorSubtotalCalculations: {
+            'autosweep': [],
+            'easytrip': [],
+          },
+        ),
+      );
+    }
+
+    if (segments.isEmpty) {
+      return RouteResult.calculate(
+        segments: [],
+        tollCharges: [],
+        orderedPlazaIds: [originPlazaId, destinationPlazaId],
+        warnings: [
+          'Fare data unavailable: No valid road path found connecting $originPlazaId to $destinationPlazaId.'
+        ],
+        vehicleClass: vehicleClass,
+        debugInfo: RouteCalculationDebug(
+          chosenOrderedPlazaPath: [originPlazaId, destinationPlazaId],
+          excludedPathAlternatives: [],
+          matchedRuleIds: [],
+          consideredNotChargedRules: [],
+          operatorSubtotalCalculations: {
+            'autosweep': [],
+            'easytrip': [],
+          },
+        ),
+      );
+    }
+
+    final allPlazas = plazas ?? defaultPlazas;
+    final allRules = rules ?? defaultTollRules;
+    final plazaMap = {for (final p in allPlazas) p.id: p};
+
+    // 1. Reconstruct ordered list of traversed plazas
+    final List<String> orderedPlazas = [originPlazaId];
+    for (final seg in segments) {
+      if (orderedPlazas.isEmpty || orderedPlazas.last != seg.entryPoint) {
+        if (!orderedPlazas.contains(seg.entryPoint)) {
+          orderedPlazas.add(seg.entryPoint);
+        }
+      }
+      if (!orderedPlazas.contains(seg.exitPoint)) {
+        orderedPlazas.add(seg.exitPoint);
+      }
+    }
+    if (orderedPlazas.last != destinationPlazaId) {
+      orderedPlazas.add(destinationPlazaId);
+    }
+
+    final List<TollChargeBreakdown> chargeList = [];
+    final List<String> warnings = [];
+    final Set<String> appliedRuleIds = {};
+    final List<Map<String, String>> excludedAlternatives = [];
+    final List<Map<String, String>> consideredNotCharged = [];
+
+    // Document routing mode alternatives
+    if (!useSkyway) {
+      excludedAlternatives.add({
+        'path': 'Skyway Stages 1–3 Elevated Viaduct',
+        'reason': 'Excluded per user preference (useSkyway=false). Route routed via SLEX At-Grade surface road.',
+      });
+    } else {
+      excludedAlternatives.add({
+        'path': 'SLEX At-Grade Surface Section',
+        'reason': 'Elevated Skyway viaduct selected for direct elevated transit.',
+      });
+    }
+
+    // 2. Group contiguous segments by expressway corridor
+    final List<List<TollSegment>> corridors = [];
+    List<TollSegment> currentCorridor = [];
+
+    for (final seg in segments) {
+      if (currentCorridor.isEmpty) {
+        currentCorridor.add(seg);
+      } else if (currentCorridor.last.expressway == seg.expressway) {
+        currentCorridor.add(seg);
+      } else {
+        corridors.add(List.from(currentCorridor));
+        currentCorridor = [seg];
+      }
+    }
+    if (currentCorridor.isNotEmpty) {
+      corridors.add(currentCorridor);
+    }
+
+    // 3. Process each corridor according to its TRB collection system
+    for (final corridorSegments in corridors) {
+      final expressway = corridorSegments.first.expressway;
+      final corridorEntry = corridorSegments.first.entryPoint;
+      final corridorExit = corridorSegments.last.exitPoint;
+      final corridorOperator = corridorSegments.first.operator;
+
+      // Determine corridor direction
+      final entryPlaza = plazaMap[corridorEntry];
+      final exitPlaza = plazaMap[corridorExit];
+      final isNorthbound = (entryPlaza != null && exitPlaza != null)
+          ? entryPlaza.orderIndex < exitPlaza.orderIndex
+          : true;
+      final directionStr = isNorthbound ? 'northbound' : 'southbound';
+
+      // --- A. CLOSED SYSTEM EXPRESSWAYS (Exact OD Matrix Lookup) ---
+      if (expressway == 'STAR' ||
+          expressway == 'SLEX' ||
+          expressway == 'CALAX' ||
+          expressway == 'SCTEX' ||
+          expressway == 'TPLEX') {
+
+        final corridorPlazas = corridorSegments.expand((s) => [s.entryPoint, s.exitPoint]).toSet();
+
+        // Special handling for SLEX if route combines Closed System + At-Grade section (Alabang <-> Magallanes)
+        if (expressway == 'SLEX' &&
+            ((corridorEntry != 'slex_alabang' && corridorExit == 'slex_magallanes') ||
+             (corridorEntry == 'slex_magallanes' && corridorExit != 'slex_alabang') ||
+             (corridorPlazas.contains('slex_alabang') && corridorPlazas.contains('slex_magallanes') && corridorEntry != 'slex_alabang'))) {
+          final closedEntry = corridorEntry == 'slex_magallanes' ? 'slex_alabang' : corridorEntry;
+          final closedExit = corridorExit == 'slex_magallanes' ? 'slex_alabang' : corridorExit;
+
+          // 1. Closed system charge to/from Alabang
+          final closedRule = _findMatchingClosedRule(allRules, 'SLEX', closedEntry, closedExit, directionStr);
+          if (closedRule != null) {
+            appliedRuleIds.add(closedRule.id);
+            final fare = closedRule.getFareForClass(vehicleClass);
+            chargeList.add(TollChargeBreakdown(
+              tollRuleId: closedRule.id,
+              expressway: 'SLEX',
+              operator: closedRule.operator,
+              collectionType: 'closedSystem',
+              entryPlazaId: closedEntry,
+              exitPlazaId: closedExit,
+              vehicleClass: vehicleClass,
+              amount: fare,
+              sourceName: closedRule.sourceName,
+              sourceUrl: closedRule.sourceUrl,
+              effectiveFrom: closedRule.effectiveFrom,
+              ratesLastUpdated: closedRule.ratesLastUpdated,
+              verificationStatus: closedRule.verificationStatus,
+              explanation: 'SLEX Closed-System Toll (${plazaMap[closedEntry]?.name ?? closedEntry} → ${plazaMap[closedExit]?.name ?? closedExit})',
+            ));
+          }
+
+          // 2. At-Grade surface toll (Alabang <-> Magallanes)
+          final atGradeRule = allRules.firstWhere(
+            (r) => r.id == 'rule_slex_alabang_magallanes_atgrade',
+            orElse: () => const TollChargeRule(
+              id: 'rule_slex_alabang_magallanes_atgrade',
+              expressway: 'SLEX',
+              operator: 'autosweep',
+              collectionType: 'closedSystem',
+              direction: 'both',
+              entryPlazaId: 'slex_alabang',
+              exitPlazaId: 'slex_magallanes',
+              fareClass1: 45.0,
+              fareClass2: 90.0,
+              fareClass3: 135.0,
+              effectiveFrom: null,
+              sourceName: 'TRB SLEX At-Grade Rate',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/slex',
+            ),
+          );
+          appliedRuleIds.add(atGradeRule.id);
+          final atGradeFare = atGradeRule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: atGradeRule.id,
+            expressway: 'SLEX',
+            operator: atGradeRule.operator,
+            collectionType: 'closedSystem',
+            entryPlazaId: 'slex_alabang',
+            exitPlazaId: 'slex_magallanes',
+            vehicleClass: vehicleClass,
+            amount: atGradeFare,
+            sourceName: atGradeRule.sourceName,
+            sourceUrl: atGradeRule.sourceUrl,
+            effectiveFrom: atGradeRule.effectiveFrom,
+            ratesLastUpdated: atGradeRule.ratesLastUpdated,
+            verificationStatus: atGradeRule.verificationStatus,
+            explanation: 'SLEX At-Grade Surface Section (Alabang ↔ Magallanes/EDSA)',
+          ));
+        } else {
+          // Standard Closed System OD lookup
+          final matchedRule = _findMatchingClosedRule(allRules, expressway, corridorEntry, corridorExit, directionStr);
+
+          if (matchedRule != null) {
+            appliedRuleIds.add(matchedRule.id);
+            final fare = matchedRule.getFareForClass(vehicleClass);
+            chargeList.add(TollChargeBreakdown(
+              tollRuleId: matchedRule.id,
+              expressway: expressway,
+              operator: matchedRule.operator,
+              collectionType: 'closedSystem',
+              entryPlazaId: corridorEntry,
+              exitPlazaId: corridorExit,
+              vehicleClass: vehicleClass,
+              amount: fare,
+              sourceName: matchedRule.sourceName,
+              sourceUrl: matchedRule.sourceUrl,
+              effectiveFrom: matchedRule.effectiveFrom,
+              ratesLastUpdated: matchedRule.ratesLastUpdated,
+              verificationStatus: matchedRule.verificationStatus,
+              explanation:
+                  '$expressway Closed-System Toll (${entryPlaza?.name ?? corridorEntry} → ${exitPlaza?.name ?? corridorExit})',
+            ));
+          } else {
+            warnings.add('Rate not yet available for this route.');
+            chargeList.add(TollChargeBreakdown(
+              tollRuleId: 'unverified_${expressway}_${corridorEntry}_$corridorExit',
+              expressway: expressway,
+              operator: corridorOperator,
+              collectionType: 'closedSystem',
+              entryPlazaId: corridorEntry,
+              exitPlazaId: corridorExit,
+              vehicleClass: vehicleClass,
+              amount: 0.0,
+              sourceName: 'TRB Rate Matrix Pending',
+              verificationStatus: TollVerificationStatus.needsManualReview,
+              explanation: 'Rate not yet available for this route.',
+            ));
+          }
+        }
+      }
+
+      // --- B. SKYWAY STAGES 1, 2, 3 (Open Barrier / Segment Gantries) ---
+      else if (expressway == 'SKYWAY') {
+        final corridorPlazaSet = corridorSegments.expand((s) => [s.entryPoint, s.exitPoint]).toSet();
+
+        // Skyway Stage 1 & 2 (Alabang to Buendia elevated):
+        final usesStage12 = corridorPlazaSet.contains('skyway_alabang') ||
+            corridorPlazaSet.contains('skyway_sucat') ||
+            corridorPlazaSet.contains('skyway_bicutan') ||
+            corridorPlazaSet.contains('skyway_naiax') ||
+            corridorPlazaSet.contains('skyway_magallanes') ||
+            corridorPlazaSet.contains('skyway_don_bosco');
+
+        final reachesBuendiaOrNorth = corridorPlazaSet.contains('skyway_buendia') ||
+            corridorPlazaSet.contains('skyway_quirino') ||
+            corridorPlazaSet.contains('skyway_nagtahan') ||
+            corridorPlazaSet.contains('skyway_e_rodriguez') ||
+            corridorPlazaSet.contains('skyway_quezon_ave') ||
+            corridorPlazaSet.contains('skyway_sgt_rivera') ||
+            corridorPlazaSet.contains('skyway_balintawak');
+
+        if (usesStage12 && reachesBuendiaOrNorth && !appliedRuleIds.contains('rule_skyway_stage12_alabang_buendia')) {
+          appliedRuleIds.add('rule_skyway_stage12_alabang_buendia');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_skyway_stage12_alabang_buendia',
+            orElse: () => const TollChargeRule(
+              id: 'rule_skyway_stage12_alabang_buendia',
+              expressway: 'SKYWAY',
+              operator: 'autosweep',
+              collectionType: 'openBarrier',
+              direction: 'both',
+              barrierPlazaId: 'skyway_alabang',
+              fareClass1: 147.0,
+              fareClass2: 294.0,
+              fareClass3: 441.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Skyway Rate Matrix',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/skyway-1-2',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'SKYWAY',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'skyway_alabang',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'Skyway Stages 1 & 2 Main Elevated Viaduct (Alabang ↔ Buendia)',
+          ));
+        }
+
+        // Skyway Stage 3 Ramps & Mainline:
+        final hasBuendia = corridorPlazaSet.contains('skyway_buendia') || corridorPlazaSet.contains('skyway_quirino') || corridorPlazaSet.contains('skyway_nagtahan');
+        final hasQuezonAve = corridorPlazaSet.contains('skyway_quezon_ave') || corridorPlazaSet.contains('skyway_e_rodriguez');
+        final hasBalintawak = corridorPlazaSet.contains('skyway_balintawak') || corridorPlazaSet.contains('skyway_sgt_rivera');
+
+        if (hasBuendia && hasBalintawak && !appliedRuleIds.contains('rule_skyway_stage3_buendia_balintawak')) {
+          appliedRuleIds.add('rule_skyway_stage3_buendia_balintawak');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_skyway_stage3_buendia_balintawak',
+            orElse: () => const TollChargeRule(
+              id: 'rule_skyway_stage3_buendia_balintawak',
+              expressway: 'SKYWAY',
+              operator: 'autosweep',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'skyway_balintawak',
+              fareClass1: 264.0,
+              fareClass2: 528.0,
+              fareClass3: 792.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Skyway Stage 3 Matrix',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/skyway-3',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'SKYWAY',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'skyway_balintawak',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'Skyway Stage 3 Metro Manila Bypass (Buendia ↔ Balintawak)',
+          ));
+        } else if (hasBuendia && hasQuezonAve && !hasBalintawak && !appliedRuleIds.contains('rule_skyway_stage3_buendia_quezonave')) {
+          appliedRuleIds.add('rule_skyway_stage3_buendia_quezonave');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_skyway_stage3_buendia_quezonave',
+            orElse: () => const TollChargeRule(
+              id: 'rule_skyway_stage3_buendia_quezonave',
+              expressway: 'SKYWAY',
+              operator: 'autosweep',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'skyway_quezon_ave',
+              fareClass1: 105.0,
+              fareClass2: 210.0,
+              fareClass3: 315.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Skyway Stage 3 Matrix',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/skyway-3',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'SKYWAY',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'skyway_quezon_ave',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'Skyway Stage 3 Section (Buendia ↔ Quezon Ave Ramp)',
+          ));
+        } else if (!hasBuendia && hasQuezonAve && hasBalintawak && !appliedRuleIds.contains('rule_skyway_stage3_quezonave_balintawak')) {
+          appliedRuleIds.add('rule_skyway_stage3_quezonave_balintawak');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_skyway_stage3_quezonave_balintawak',
+            orElse: () => const TollChargeRule(
+              id: 'rule_skyway_stage3_quezonave_balintawak',
+              expressway: 'SKYWAY',
+              operator: 'autosweep',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'skyway_balintawak',
+              fareClass1: 129.0,
+              fareClass2: 258.0,
+              fareClass3: 387.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Skyway Stage 3 Matrix',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/skyway-3',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'SKYWAY',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'skyway_balintawak',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'Skyway Stage 3 Section (Quezon Ave ↔ Balintawak Ramp)',
+          ));
+        }
+      }
+
+      // --- C. NLEX (Open System Flat Barrier & Closed System Northbound) ---
+      else if (expressway == 'NLEX') {
+        final corridorPlazaSet = corridorSegments.expand((s) => [s.entryPoint, s.exitPoint]).toSet();
+
+        // NLEX Open System Flat Rate (Balintawak / Mindanao Ave / Karuhatan / Meycauayan / Marilao):
+        final inOpenSystem = corridorPlazaSet.contains('nlex_balintawak') ||
+            corridorPlazaSet.contains('nlex_mindanao_ave') ||
+            corridorPlazaSet.contains('nlex_valenzuela') ||
+            corridorPlazaSet.contains('nlex_meycauayan') ||
+            corridorPlazaSet.contains('nlex_marilao');
+
+        if (inOpenSystem && !appliedRuleIds.contains('rule_nlex_open_system')) {
+          appliedRuleIds.add('rule_nlex_open_system');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_nlex_open_system',
+            orElse: () => const TollChargeRule(
+              id: 'rule_nlex_open_system',
+              expressway: 'NLEX',
+              operator: 'easytrip',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'nlex_balintawak',
+              fareClass1: 69.0,
+              fareClass2: 172.0,
+              fareClass3: 206.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for NLEX Open System (June 2024)',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/nlex',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'NLEX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: corridorPlazaSet.contains('nlex_mindanao_ave') ? 'nlex_mindanao_ave' : 'nlex_balintawak',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'NLEX Open System Flat Rate (Balintawak / Mindanao Ave ↔ Marilao)',
+          ));
+        }
+
+        // NLEX Closed System (North of Marilao: Bocaue to Sta. Ines):
+        final reachesNorthOfMarilao = corridorPlazaSet.any((p) {
+          final idx = plazaMap[p]?.orderIndex ?? 0;
+          return idx > 5; // Beyond Marilao
+        });
+
+        if (reachesNorthOfMarilao && !appliedRuleIds.contains('rule_nlex_closed_portion')) {
+          appliedRuleIds.add('rule_nlex_closed_portion');
+          final closedRule = _findMatchingClosedRule(allRules, 'NLEX', 'nlex_marilao', corridorExit, directionStr);
+          final fare = closedRule != null ? closedRule.getFareForClass(vehicleClass) : (vehicleClass == 2 ? 168.0 : vehicleClass == 3 ? 202.0 : 67.0);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: closedRule?.id ?? 'rule_nlex_closed_portion',
+            expressway: 'NLEX',
+            operator: 'easytrip',
+            collectionType: 'closedSystem',
+            entryPlazaId: 'nlex_marilao',
+            exitPlazaId: corridorExit,
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: closedRule?.sourceName ?? 'NLEX Corp / TRB Matrix',
+            sourceUrl: closedRule?.sourceUrl ?? 'https://trb.gov.ph/index.php/toll-rates/nlex',
+            effectiveFrom: closedRule?.effectiveFrom,
+            ratesLastUpdated: closedRule?.ratesLastUpdated,
+            verificationStatus: closedRule?.verificationStatus ?? TollVerificationStatus.verified,
+            explanation: 'NLEX Closed System Toll (Marilao → ${plazaMap[corridorExit]?.name ?? corridorExit})',
+          ));
+        }
+      }
+
+      // --- D. MCX, NAIAX, NLEX CONNECTOR, CAVITEX, CCLEX (Fixed Barriers) ---
+      else if (expressway == 'MCX') {
+        if (!appliedRuleIds.contains('rule_mcx_flat')) {
+          appliedRuleIds.add('rule_mcx_flat');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_mcx_flat',
+            orElse: () => const TollChargeRule(
+              id: 'rule_mcx_flat',
+              expressway: 'MCX',
+              operator: 'autosweep',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'mcx_daang_hari',
+              fareClass1: 17.0,
+              fareClass2: 34.0,
+              fareClass3: 51.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for MCX',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/mcx',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'MCX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'mcx_daang_hari',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'Muntinlupa-Cavite Expressway Flat Barrier Toll',
+          ));
+        }
+      } else if (expressway == 'NAIAX') {
+        if (!appliedRuleIds.contains('rule_naiax_flat')) {
+          appliedRuleIds.add('rule_naiax_flat');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_naiax_mainline_flat' || r.id == 'rule_naiax_flat',
+            orElse: () => const TollChargeRule(
+              id: 'rule_naiax_mainline_flat',
+              expressway: 'NAIAX',
+              operator: 'autosweep',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'naiax_terminal3',
+              fareClass1: 45.0,
+              fareClass2: 90.0,
+              fareClass3: 135.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for NAIAX',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/naiax',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'NAIAX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'naiax_terminal3',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'NAIA Expressway Airport Viaduct Flat Toll',
+          ));
+        }
+      } else if (expressway == 'NLEX-C') {
+        if (!appliedRuleIds.contains('rule_nlex_connector_flat')) {
+          appliedRuleIds.add('rule_nlex_connector_flat');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_nlex_connector_flat',
+            orElse: () => const TollChargeRule(
+              id: 'rule_nlex_connector_flat',
+              expressway: 'NLEX-C',
+              operator: 'easytrip',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'nlex_connector_c3',
+              fareClass1: 86.0,
+              fareClass2: 215.0,
+              fareClass3: 258.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for NLEX Connector',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/nlex-connector',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'NLEX-C',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'nlex_connector_c3',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'NLEX Connector Elevated Viaduct Toll',
+          ));
+        }
+      } else if (expressway == 'CAVITEX') {
+        final corridorPlazaSet = corridorSegments.expand((s) => [s.entryPoint, s.exitPoint]).toSet();
+
+        // 1. C5 South Link Section
+        if ((corridorPlazaSet.contains('cavitex_c5_merville') || corridorPlazaSet.contains('cavitex_c5_taguig')) &&
+            !appliedRuleIds.contains('rule_cavitex_c5_southlink')) {
+          appliedRuleIds.add('rule_cavitex_c5_southlink');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_cavitex_c5_southlink',
+            orElse: () => const TollChargeRule(
+              id: 'rule_cavitex_c5_southlink',
+              expressway: 'CAVITEX',
+              operator: 'easytrip',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'cavitex_c5_merville',
+              fareClass1: 35.0,
+              fareClass2: 70.0,
+              fareClass3: 105.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for CAVITEX C5 South Link',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/cavitex-toll-rate',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'CAVITEX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'cavitex_c5_merville',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'CAVITEX C5 South Link Barrier Toll',
+          ));
+        }
+
+        // 2. Kawit Extension Section
+        if (corridorPlazaSet.contains('cavitex_kawit') && !appliedRuleIds.contains('rule_cavitex_kawit_extension')) {
+          appliedRuleIds.add('rule_cavitex_kawit_extension');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_cavitex_kawit_extension',
+            orElse: () => const TollChargeRule(
+              id: 'rule_cavitex_kawit_extension',
+              expressway: 'CAVITEX',
+              operator: 'easytrip',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'cavitex_kawit',
+              fareClass1: 88.0,
+              fareClass2: 176.0,
+              fareClass3: 264.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for CAVITEX',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/cavitex-toll-rate',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'CAVITEX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'cavitex_kawit',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'CAVITEX R-1 Kawit Extension Barrier Toll',
+          ));
+        }
+
+        // 3. Parañaque Mainline Barrier
+        if ((corridorPlazaSet.contains('cavitex_paranaque') || corridorPlazaSet.contains('cavitex_seaside')) &&
+            !corridorPlazaSet.contains('cavitex_c5_merville') &&
+            !corridorPlazaSet.contains('cavitex_c5_taguig') &&
+            !appliedRuleIds.contains('rule_cavitex_paranaque_flat')) {
+          appliedRuleIds.add('rule_cavitex_paranaque_flat');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_cavitex_paranaque_flat',
+            orElse: () => const TollChargeRule(
+              id: 'rule_cavitex_paranaque_flat',
+              expressway: 'CAVITEX',
+              operator: 'easytrip',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'cavitex_paranaque',
+              fareClass1: 39.0,
+              fareClass2: 78.0,
+              fareClass3: 117.0,
+              effectiveFrom: null,
+              sourceName: 'TRB Approved Toll Rate Matrix for CAVITEX',
+              sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/cavitex-toll-rate',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'CAVITEX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'cavitex_paranaque',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'CAVITEX Parañaque Mainline Barrier Toll',
+          ));
+        }
+      } else if (expressway == 'CCLEX') {
+        if (!appliedRuleIds.contains('rule_cclex_flat')) {
+          appliedRuleIds.add('rule_cclex_flat');
+          final rule = allRules.firstWhere(
+            (r) => r.id == 'rule_cclex_flat',
+            orElse: () => const TollChargeRule(
+              id: 'rule_cclex_flat',
+              expressway: 'CCLEX',
+              operator: 'easytrip',
+              collectionType: 'openBarrier',
+              barrierPlazaId: 'cclex_cordova',
+              fareClass1: 90.0,
+              fareClass2: 180.0,
+              fareClass3: 270.0,
+              effectiveFrom: null,
+              sourceName: 'CCLEC Official Toll Rate Matrix for CCLEX',
+              sourceUrl: 'https://cclex.com.ph/toll-rates',
+            ),
+          );
+          final fare = rule.getFareForClass(vehicleClass);
+          chargeList.add(TollChargeBreakdown(
+            tollRuleId: rule.id,
+            expressway: 'CCLEX',
+            operator: rule.operator,
+            collectionType: 'openBarrier',
+            chargedAtPlazaId: 'cclex_cordova',
+            vehicleClass: vehicleClass,
+            amount: fare,
+            sourceName: rule.sourceName,
+            sourceUrl: rule.sourceUrl,
+            effectiveFrom: rule.effectiveFrom,
+            ratesLastUpdated: rule.ratesLastUpdated,
+            verificationStatus: rule.verificationStatus,
+            explanation: 'Cebu-Cordova Link Expressway Bridge Toll',
+          ));
+        }
+      }
+    }
+
+    // 4. Trace considered-not-charged rules at interchanges along the route
+    final traversedPlazaSet = orderedPlazas.toSet();
+    if (traversedPlazaSet.contains('slex_mamplasan') && !traversedPlazaSet.any((p) => p.startsWith('calax_'))) {
+      consideredNotCharged.add({
+        'ruleId': 'rule_calax_mamplasan_santarosa',
+        'reason': 'Vehicle remained on SLEX mainline; did not traverse CALAX entry connector at Mamplasan interchange.',
+      });
+    }
+    if (traversedPlazaSet.contains('slex_susana_heights') && !traversedPlazaSet.contains('mcx_daang_hari')) {
+      consideredNotCharged.add({
+        'ruleId': 'rule_mcx_flat',
+        'reason': 'Vehicle remained on SLEX mainline; did not exit into MCX Daang Hari connector.',
+      });
+    }
+    if (traversedPlazaSet.contains('skyway_sales') && !traversedPlazaSet.any((p) => p.startsWith('naiax_'))) {
+      consideredNotCharged.add({
+        'ruleId': 'rule_naiax_mainline_flat',
+        'reason': 'Vehicle remained on Skyway mainline; did not exit into NAIAX Airport Viaduct.',
+      });
+    }
+    if (traversedPlazaSet.contains('nlex_balintawak') && !traversedPlazaSet.any((p) => p.startsWith('nlex_connector_'))) {
+      consideredNotCharged.add({
+        'ruleId': 'rule_nlex_connector_flat',
+        'reason': 'Vehicle remained on NLEX mainline; did not enter NLEX Connector elevated ramp.',
+      });
+    }
+
+    // 5. Itemize operator subtotal calculations
+    final Map<String, List<Map<String, dynamic>>> operatorSubtotals = {
+      'autosweep': [],
+      'easytrip': [],
+    };
+    for (final charge in chargeList) {
+      final opKey = charge.operator.toLowerCase().trim();
+      operatorSubtotals.putIfAbsent(opKey, () => []).add({
+        'ruleId': charge.tollRuleId,
+        'expressway': charge.expressway,
+        'amount': charge.amount,
+        'status': charge.verificationStatus.name,
+      });
+    }
+
+    final debugTrace = RouteCalculationDebug(
+      chosenOrderedPlazaPath: orderedPlazas,
+      excludedPathAlternatives: excludedAlternatives,
+      matchedRuleIds: chargeList.map((c) => c.tollRuleId).toList(),
+      consideredNotChargedRules: consideredNotCharged,
+      operatorSubtotalCalculations: operatorSubtotals,
+    );
+
+    return RouteResult.calculate(
+      segments: segments,
+      tollCharges: chargeList,
+      orderedPlazaIds: orderedPlazas,
+      warnings: warnings,
+      vehicleClass: vehicleClass,
+      debugInfo: debugTrace,
+    );
+  }
+
+  static TollChargeRule? _findMatchingClosedRule(
+    List<TollChargeRule> rules,
+    String expressway,
+    String entryPlazaId,
+    String exitPlazaId,
+    String directionStr,
+  ) {
+    for (final rule in rules) {
+      if (rule.expressway == expressway &&
+          rule.collectionType == 'closedSystem' &&
+          rule.isActive) {
+        final matchesForward = rule.entryPlazaId == entryPlazaId &&
+            rule.exitPlazaId == exitPlazaId &&
+            (rule.direction == directionStr || rule.direction == 'both');
+
+        final matchesReverse = rule.entryPlazaId == exitPlazaId &&
+            rule.exitPlazaId == entryPlazaId &&
+            rule.direction == 'both';
+
+        if (matchesForward || matchesReverse) {
+          return rule;
+        }
+      }
+    }
+    return null;
   }
 
   /// Synchronously calculates the full fare breakdown from [originPlazaId] to [destinationPlazaId]
@@ -197,16 +1131,24 @@ class TollService {
     int vehicleClass = 1,
     List<TollPlaza>? plazas,
     List<TollSegment>? segments,
+    List<TollChargeRule>? rules,
+    bool useSkyway = true,
   }) {
     final path = findPathSync(
       originPlazaId,
       destinationPlazaId,
       plazas: plazas,
       segments: segments,
+      useSkyway: useSkyway,
     );
-    return RouteResult.calculate(
+
+    return calculateRouteChargesSync(
       segments: path,
+      originPlazaId: originPlazaId,
+      destinationPlazaId: destinationPlazaId,
       vehicleClass: vehicleClass,
+      plazas: plazas,
+      rules: rules,
     );
   }
 
@@ -216,10 +1158,40 @@ class TollService {
     required String originPlazaId,
     required String destinationPlazaId,
     int vehicleClass = 1,
+    bool useSkyway = true,
   }) async {
-    final segments = await findPathBetweenPlazas(originPlazaId, destinationPlazaId);
-    return RouteResult.calculate(
+    final allPlazas = await getCachedPlazas();
+    final allRules = await getCachedTollRules();
+
+    final segments = findPathSync(
+      originPlazaId,
+      destinationPlazaId,
+      plazas: allPlazas,
+      useSkyway: useSkyway,
+    );
+
+    return calculateRouteChargesSync(
       segments: segments,
+      originPlazaId: originPlazaId,
+      destinationPlazaId: destinationPlazaId,
+      vehicleClass: vehicleClass,
+      plazas: allPlazas,
+      rules: allRules,
+    );
+  }
+
+  /// Calculates the fare breakdown for given segments and vehicle class.
+  RouteResult calculateFare({
+    required List<TollSegment> segments,
+    int vehicleClass = 1,
+  }) {
+    if (segments.isEmpty) {
+      return RouteResult.calculate(segments: [], vehicleClass: vehicleClass);
+    }
+    return calculateRouteChargesSync(
+      segments: segments,
+      originPlazaId: segments.first.entryPoint,
+      destinationPlazaId: segments.last.exitPoint,
       vehicleClass: vehicleClass,
     );
   }
@@ -228,7 +1200,6 @@ class TollService {
   // PREDEFINED ROUTES (BACKWARD COMPATIBILITY)
   // ===========================================================================
 
-  /// Fetches all active predefined routes from Firestore.
   Stream<List<RouteModel>> getActiveRoutes() {
     return _firestoreService.routesRef
         .where('isActive', isEqualTo: true)
@@ -242,7 +1213,6 @@ class TollService {
     });
   }
 
-  /// Retrieves locally cached routes if offline.
   Future<List<RouteModel>> getCachedRoutes() async {
     final cached = await _cacheService.getRoutes();
     if (cached != null && cached.isNotEmpty) {
@@ -251,7 +1221,6 @@ class TollService {
     return defaultRoutes;
   }
 
-  /// Fetches the ordered list of [TollSegment]s for a given [RouteModel].
   Future<List<TollSegment>> getSegmentsForRoute(RouteModel route) async {
     if (route.segmentIds.isEmpty) {
       return [];
@@ -268,18 +1237,6 @@ class TollService {
     return list;
   }
 
-  /// Calculates the fare breakdown for given segments and vehicle class.
-  RouteResult calculateFare({
-    required List<TollSegment> segments,
-    int vehicleClass = 1,
-  }) {
-    return RouteResult.calculate(
-      segments: segments,
-      vehicleClass: vehicleClass,
-    );
-  }
-
-  /// Saves the user's last-calculated route and fare breakdown for offline restoration.
   Future<void> saveLastCalculation({
     required String routeId,
     required int vehicleClass,
@@ -294,20 +1251,16 @@ class TollService {
     );
   }
 
-  /// Retrieves the user's last-calculated route and fare breakdown.
   Future<Map<String, dynamic>?> getLastCalculation() {
     return _cacheService.getLastTripCalculation();
   }
 
   // ===========================================================================
-  // EMBEDDED SAMPLE GRAPH CATALOG (REPRESENTATIVE PLAZAS & SEGMENTS)
+  // EMBEDDED TOLL PLAZAS CATALOG (ALL SUPPORTED EXPRESSWAYS)
   // ===========================================================================
 
-  /// Default representative toll plazas across major connected corridors nationwide.
   static final List<TollPlaza> defaultPlazas = [
-    // =========================================================================
     // 1. STAR TOLLWAY (Autosweep)
-    // =========================================================================
     const TollPlaza(
       id: 'star_batangas',
       name: 'Batangas City Terminal',
@@ -359,9 +1312,7 @@ class TollService {
       connectsTo: ['slex_sto_tomas'],
     ),
 
-    // =========================================================================
     // 2. SLEX - South Luzon Expressway (Autosweep)
-    // =========================================================================
     const TollPlaza(
       id: 'slex_sto_tomas',
       name: 'Sto. Tomas (SLEX)',
@@ -482,10 +1433,34 @@ class TollService {
       isInterchange: true,
       connectsTo: ['skyway_alabang'],
     ),
+    const TollPlaza(
+      id: 'slex_sucat_atgrade',
+      name: 'Sucat Exit (At-Grade)',
+      expressway: 'SLEX',
+      expresswayName: 'South Luzon Expressway',
+      operator: 'autosweep',
+      orderIndex: 15,
+    ),
+    const TollPlaza(
+      id: 'slex_bicutan_atgrade',
+      name: 'Bicutan Exit (At-Grade)',
+      expressway: 'SLEX',
+      expresswayName: 'South Luzon Expressway',
+      operator: 'autosweep',
+      orderIndex: 16,
+    ),
+    const TollPlaza(
+      id: 'slex_magallanes',
+      name: 'Magallanes / EDSA (SLEX At-Grade)',
+      expressway: 'SLEX',
+      expresswayName: 'South Luzon Expressway',
+      operator: 'autosweep',
+      orderIndex: 17,
+      isInterchange: true,
+      connectsTo: ['nlex_balintawak'],
+    ),
 
-    // =========================================================================
     // 3. MCX - Muntinlupa-Cavite Expressway (Autosweep)
-    // =========================================================================
     const TollPlaza(
       id: 'mcx_susana_heights',
       name: 'Susana Heights (MCX)',
@@ -505,9 +1480,7 @@ class TollService {
       orderIndex: 2,
     ),
 
-    // =========================================================================
     // 4. SKYWAY STAGES 1, 2, 3 (Autosweep)
-    // =========================================================================
     const TollPlaza(
       id: 'skyway_alabang',
       name: 'Alabang Main Gantry',
@@ -619,9 +1592,7 @@ class TollService {
       connectsTo: ['nlex_balintawak'],
     ),
 
-    // =========================================================================
     // 5. NAIAX - NAIA Expressway (Autosweep)
-    // =========================================================================
     const TollPlaza(
       id: 'naiax_skyway',
       name: 'Sales Road / Skyway Ramp',
@@ -657,9 +1628,7 @@ class TollService {
       orderIndex: 4,
     ),
 
-    // =========================================================================
     // 6. NLEX - North Luzon Expressway (Easytrip)
-    // =========================================================================
     const TollPlaza(
       id: 'nlex_balintawak',
       name: 'Balintawak Barrier (NLEX)',
@@ -668,7 +1637,7 @@ class TollService {
       operator: 'easytrip',
       orderIndex: 1,
       isInterchange: true,
-      connectsTo: ['skyway_balintawak', 'nlex_connector_c3'],
+      connectsTo: ['skyway_balintawak', 'nlex_connector_c3', 'slex_magallanes'],
     ),
     const TollPlaza(
       id: 'nlex_mindanao_ave',
@@ -793,9 +1762,7 @@ class TollService {
       connectsTo: ['sctex_clark_north'],
     ),
 
-    // =========================================================================
     // 7. NLEX CONNECTOR (Easytrip)
-    // =========================================================================
     const TollPlaza(
       id: 'nlex_connector_c3',
       name: 'Caloocan C3 Interchange',
@@ -823,9 +1790,7 @@ class TollService {
       orderIndex: 3,
     ),
 
-    // =========================================================================
     // 8. SCTEX - Subic-Clark-Tarlac Expressway (Easytrip)
-    // =========================================================================
     const TollPlaza(
       id: 'sctex_subic_tipo',
       name: 'Subic / Tipo Toll Plaza',
@@ -911,9 +1876,7 @@ class TollService {
       connectsTo: ['tplex_tarlac'],
     ),
 
-    // =========================================================================
     // 9. TPLEX - Tarlac-Pangasinan-La Union (Autosweep)
-    // =========================================================================
     const TollPlaza(
       id: 'tplex_tarlac',
       name: 'Tarlac Central (TPLEX)',
@@ -997,9 +1960,7 @@ class TollService {
       orderIndex: 10,
     ),
 
-    // =========================================================================
     // 10. CALAX - Cavite-Laguna Expressway (Easytrip)
-    // =========================================================================
     const TollPlaza(
       id: 'calax_mamplasan',
       name: 'Mamplasan Barrier (CALAX)',
@@ -1059,9 +2020,7 @@ class TollService {
       orderIndex: 7,
     ),
 
-    // =========================================================================
     // 11. CAVITEX & C5 SOUTH LINK (Easytrip)
-    // =========================================================================
     const TollPlaza(
       id: 'cavitex_seaside',
       name: 'Roxas Blvd / Seaside Entry',
@@ -1111,9 +2070,7 @@ class TollService {
       orderIndex: 6,
     ),
 
-    // =========================================================================
-    // 12. CCLEX - Cebu-Cordova Link Expressway (CCLEX / Easytrip)
-    // =========================================================================
+    // 12. CCLEX - Cebu-Cordova Link Expressway (Easytrip)
     const TollPlaza(
       id: 'cclex_cebu_srp',
       name: 'Cebu City (SRP) Plaza',
@@ -1132,11 +2089,12 @@ class TollService {
     ),
   ];
 
-  /// Default connected toll segments for routing and offline fallback.
+  // ===========================================================================
+  // EMBEDDED PHYSICAL ROAD SEGMENTS (TOPOLOGY & DISTANCE KM ONLY)
+  // ===========================================================================
+
   static final List<TollSegment> defaultSegments = [
-    // =========================================================================
-    // 1. STAR TOLLWAY SEGMENTS (Autosweep)
-    // =========================================================================
+    // 1. STAR TOLLWAY (Physical Links)
     TollSegment(
       id: 'seg_star_batangas_ibaan',
       expressway: 'STAR',
@@ -1144,9 +2102,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'star_batangas',
       exitPoint: 'star_ibaan',
-      fareClass1: 35.0,
-      fareClass2: 70.0,
-      fareClass3: 105.0,
+      distanceKm: 8.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1159,9 +2115,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'star_ibaan',
       exitPoint: 'star_lipa',
-      fareClass1: 54.0,
-      fareClass2: 108.0,
-      fareClass3: 162.0,
+      distanceKm: 13.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1174,9 +2128,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'star_lipa',
       exitPoint: 'star_malvar',
-      fareClass1: 28.0,
-      fareClass2: 56.0,
-      fareClass3: 84.0,
+      distanceKm: 7.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1189,9 +2141,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'star_malvar',
       exitPoint: 'star_tanauan',
-      fareClass1: 15.0,
-      fareClass2: 30.0,
-      fareClass3: 45.0,
+      distanceKm: 6.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1204,18 +2154,14 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'star_tanauan',
       exitPoint: 'star_sto_tomas',
-      fareClass1: 14.0,
-      fareClass2: 28.0,
-      fareClass3: 42.0,
+      distanceKm: 5.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 2. SLEX SEGMENTS (Autosweep)
-    // =========================================================================
+    // 2. SLEX (Physical Links)
     TollSegment(
       id: 'seg_slex_stotomas_calamba',
       expressway: 'SLEX',
@@ -1223,9 +2169,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_sto_tomas',
       exitPoint: 'slex_calamba',
-      fareClass1: 45.0,
-      fareClass2: 90.0,
-      fareClass3: 135.0,
+      distanceKm: 7.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1238,9 +2182,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_calamba',
       exitPoint: 'slex_canlubang',
-      fareClass1: 18.0,
-      fareClass2: 36.0,
-      fareClass3: 54.0,
+      distanceKm: 4.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1253,9 +2195,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_canlubang',
       exitPoint: 'slex_silangan',
-      fareClass1: 12.0,
-      fareClass2: 24.0,
-      fareClass3: 36.0,
+      distanceKm: 3.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1268,9 +2208,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_silangan',
       exitPoint: 'slex_cabuyao',
-      fareClass1: 14.0,
-      fareClass2: 28.0,
-      fareClass3: 42.0,
+      distanceKm: 3.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1283,9 +2221,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_cabuyao',
       exitPoint: 'slex_santa_rosa',
-      fareClass1: 20.0,
-      fareClass2: 40.0,
-      fareClass3: 60.0,
+      distanceKm: 5.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1298,9 +2234,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_santa_rosa',
       exitPoint: 'slex_eton_city',
-      fareClass1: 10.0,
-      fareClass2: 20.0,
-      fareClass3: 30.0,
+      distanceKm: 2.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1313,9 +2247,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_eton_city',
       exitPoint: 'slex_greenfield',
-      fareClass1: 8.0,
-      fareClass2: 16.0,
-      fareClass3: 24.0,
+      distanceKm: 2.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1328,9 +2260,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_greenfield',
       exitPoint: 'slex_mamplasan',
-      fareClass1: 12.0,
-      fareClass2: 24.0,
-      fareClass3: 36.0,
+      distanceKm: 3.4,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1343,9 +2273,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_mamplasan',
       exitPoint: 'slex_southwoods',
-      fareClass1: 24.0,
-      fareClass2: 48.0,
-      fareClass3: 72.0,
+      distanceKm: 5.7,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1358,9 +2286,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_southwoods',
       exitPoint: 'slex_san_pedro',
-      fareClass1: 18.0,
-      fareClass2: 36.0,
-      fareClass3: 54.0,
+      distanceKm: 4.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1373,9 +2299,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_san_pedro',
       exitPoint: 'slex_susana_heights',
-      fareClass1: 16.0,
-      fareClass2: 32.0,
-      fareClass3: 48.0,
+      distanceKm: 3.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1388,9 +2312,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_susana_heights',
       exitPoint: 'slex_filinvest',
-      fareClass1: 18.0,
-      fareClass2: 36.0,
-      fareClass3: 54.0,
+      distanceKm: 4.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1403,18 +2325,53 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'slex_filinvest',
       exitPoint: 'slex_alabang',
-      fareClass1: 15.0,
-      fareClass2: 30.0,
-      fareClass3: 45.0,
+      distanceKm: 2.3,
+      direction: 'both',
+      isActive: true,
+      lastUpdated: DateTime(2026, 8, 19),
+      lastVerified: DateTime(2026, 8, 19),
+    ),
+    TollSegment(
+      id: 'seg_slex_alabang_sucat_atgrade',
+      expressway: 'SLEX',
+      expresswayName: 'South Luzon Expressway',
+      operator: 'autosweep',
+      entryPoint: 'slex_alabang',
+      exitPoint: 'slex_sucat_atgrade',
+      distanceKm: 4.6,
+      direction: 'both',
+      isActive: true,
+      lastUpdated: DateTime(2026, 8, 19),
+      lastVerified: DateTime(2026, 8, 19),
+    ),
+    TollSegment(
+      id: 'seg_slex_sucat_bicutan_atgrade',
+      expressway: 'SLEX',
+      expresswayName: 'South Luzon Expressway',
+      operator: 'autosweep',
+      entryPoint: 'slex_sucat_atgrade',
+      exitPoint: 'slex_bicutan_atgrade',
+      distanceKm: 3.9,
+      direction: 'both',
+      isActive: true,
+      lastUpdated: DateTime(2026, 8, 19),
+      lastVerified: DateTime(2026, 8, 19),
+    ),
+    TollSegment(
+      id: 'seg_slex_bicutan_magallanes_atgrade',
+      expressway: 'SLEX',
+      expresswayName: 'South Luzon Expressway',
+      operator: 'autosweep',
+      entryPoint: 'slex_bicutan_atgrade',
+      exitPoint: 'slex_magallanes',
+      distanceKm: 5.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 3. MCX SEGMENTS (Autosweep)
-    // =========================================================================
+    // 3. MCX (Physical Link)
     TollSegment(
       id: 'seg_mcx_susana_daanghari',
       expressway: 'MCX',
@@ -1422,18 +2379,14 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'mcx_susana_heights',
       exitPoint: 'mcx_daang_hari',
-      fareClass1: 17.0,
-      fareClass2: 34.0,
-      fareClass3: 51.0,
+      distanceKm: 4.0,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 4. SKYWAY STAGES 1, 2, 3 SEGMENTS (Autosweep)
-    // =========================================================================
+    // 4. SKYWAY STAGES 1, 2, 3 (Physical Elevated Links)
     TollSegment(
       id: 'seg_skyway_alabang_sucat',
       expressway: 'SKYWAY',
@@ -1441,9 +2394,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_alabang',
       exitPoint: 'skyway_sucat',
-      fareClass1: 61.0,
-      fareClass2: 122.0,
-      fareClass3: 183.0,
+      distanceKm: 4.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1456,9 +2407,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_sucat',
       exitPoint: 'skyway_bicutan',
-      fareClass1: 57.0,
-      fareClass2: 114.0,
-      fareClass3: 171.0,
+      distanceKm: 3.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1471,9 +2420,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_bicutan',
       exitPoint: 'skyway_naiax',
-      fareClass1: 46.0,
-      fareClass2: 92.0,
-      fareClass3: 138.0,
+      distanceKm: 3.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1486,9 +2433,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_naiax',
       exitPoint: 'skyway_magallanes',
-      fareClass1: 54.0,
-      fareClass2: 108.0,
-      fareClass3: 162.0,
+      distanceKm: 3.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1501,9 +2446,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_magallanes',
       exitPoint: 'skyway_don_bosco',
-      fareClass1: 20.0,
-      fareClass2: 40.0,
-      fareClass3: 60.0,
+      distanceKm: 1.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1516,9 +2459,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_don_bosco',
       exitPoint: 'skyway_buendia',
-      fareClass1: 26.0,
-      fareClass2: 52.0,
-      fareClass3: 78.0,
+      distanceKm: 2.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1531,9 +2472,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_buendia',
       exitPoint: 'skyway_quirino',
-      fareClass1: 105.0,
-      fareClass2: 210.0,
-      fareClass3: 315.0,
+      distanceKm: 3.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1546,9 +2485,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_quirino',
       exitPoint: 'skyway_nagtahan',
-      fareClass1: 25.0,
-      fareClass2: 50.0,
-      fareClass3: 75.0,
+      distanceKm: 2.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1561,9 +2498,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_nagtahan',
       exitPoint: 'skyway_e_rodriguez',
-      fareClass1: 35.0,
-      fareClass2: 70.0,
-      fareClass3: 105.0,
+      distanceKm: 3.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1576,9 +2511,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_e_rodriguez',
       exitPoint: 'skyway_quezon_ave',
-      fareClass1: 45.0,
-      fareClass2: 90.0,
-      fareClass3: 135.0,
+      distanceKm: 2.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1591,9 +2524,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_quezon_ave',
       exitPoint: 'skyway_sgt_rivera',
-      fareClass1: 55.0,
-      fareClass2: 110.0,
-      fareClass3: 165.0,
+      distanceKm: 2.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1606,18 +2537,14 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'skyway_sgt_rivera',
       exitPoint: 'skyway_balintawak',
-      fareClass1: 74.0,
-      fareClass2: 148.0,
-      fareClass3: 222.0,
+      distanceKm: 3.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 5. NAIAX SEGMENTS (Autosweep)
-    // =========================================================================
+    // 5. NAIAX (Physical Links)
     TollSegment(
       id: 'seg_naiax_skyway_t3',
       expressway: 'NAIAX',
@@ -1625,9 +2552,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'naiax_skyway',
       exitPoint: 'naiax_terminal3',
-      fareClass1: 35.0,
-      fareClass2: 70.0,
-      fareClass3: 105.0,
+      distanceKm: 3.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1640,9 +2565,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'naiax_terminal3',
       exitPoint: 'naiax_terminal1_2',
-      fareClass1: 10.0,
-      fareClass2: 20.0,
-      fareClass3: 30.0,
+      distanceKm: 4.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1655,18 +2578,14 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'naiax_terminal1_2',
       exitPoint: 'naiax_macapagal',
-      fareClass1: 0.0,
-      fareClass2: 0.0,
-      fareClass3: 0.0,
+      distanceKm: 3.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 6. NLEX SEGMENTS (Easytrip)
-    // =========================================================================
+    // 6. NLEX (Physical Links)
     TollSegment(
       id: 'seg_nlex_balintawak_mindanao',
       expressway: 'NLEX',
@@ -1674,9 +2593,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_balintawak',
       exitPoint: 'nlex_mindanao_ave',
-      fareClass1: 69.0,
-      fareClass2: 172.0,
-      fareClass3: 207.0,
+      distanceKm: 3.0,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1689,9 +2606,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_mindanao_ave',
       exitPoint: 'nlex_valenzuela',
-      fareClass1: 0.0,
-      fareClass2: 0.0,
-      fareClass3: 0.0,
+      distanceKm: 4.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1704,9 +2619,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_valenzuela',
       exitPoint: 'nlex_meycauayan',
-      fareClass1: 0.0,
-      fareClass2: 0.0,
-      fareClass3: 0.0,
+      distanceKm: 5.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1719,9 +2632,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_meycauayan',
       exitPoint: 'nlex_marilao',
-      fareClass1: 0.0,
-      fareClass2: 0.0,
-      fareClass3: 0.0,
+      distanceKm: 4.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1734,9 +2645,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_marilao',
       exitPoint: 'nlex_philippine_arena',
-      fareClass1: 0.0,
-      fareClass2: 0.0,
-      fareClass3: 0.0,
+      distanceKm: 3.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1749,9 +2658,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_philippine_arena',
       exitPoint: 'nlex_bocaue',
-      fareClass1: 5.0,
-      fareClass2: 12.0,
-      fareClass3: 15.0,
+      distanceKm: 4.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1764,9 +2671,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_bocaue',
       exitPoint: 'nlex_balagtas',
-      fareClass1: 24.0,
-      fareClass2: 60.0,
-      fareClass3: 72.0,
+      distanceKm: 5.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1779,9 +2684,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_balagtas',
       exitPoint: 'nlex_tabang',
-      fareClass1: 15.0,
-      fareClass2: 38.0,
-      fareClass3: 45.0,
+      distanceKm: 6.0,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1794,9 +2697,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_tabang',
       exitPoint: 'nlex_pulilan',
-      fareClass1: 28.0,
-      fareClass2: 70.0,
-      fareClass3: 84.0,
+      distanceKm: 8.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1809,9 +2710,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_pulilan',
       exitPoint: 'nlex_san_simon',
-      fareClass1: 36.0,
-      fareClass2: 90.0,
-      fareClass3: 108.0,
+      distanceKm: 9.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1824,9 +2723,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_san_simon',
       exitPoint: 'nlex_san_fernando',
-      fareClass1: 42.0,
-      fareClass2: 105.0,
-      fareClass3: 126.0,
+      distanceKm: 11.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1839,9 +2736,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_san_fernando',
       exitPoint: 'nlex_mexico',
-      fareClass1: 26.0,
-      fareClass2: 65.0,
-      fareClass3: 78.0,
+      distanceKm: 7.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1854,9 +2749,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_mexico',
       exitPoint: 'nlex_angeles',
-      fareClass1: 40.0,
-      fareClass2: 100.0,
-      fareClass3: 120.0,
+      distanceKm: 8.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1869,9 +2762,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_angeles',
       exitPoint: 'nlex_dau',
-      fareClass1: 22.0,
-      fareClass2: 55.0,
-      fareClass3: 66.0,
+      distanceKm: 6.4,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1884,52 +2775,42 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'nlex_dau',
       exitPoint: 'nlex_sta_ines',
-      fareClass1: 22.0,
-      fareClass2: 55.0,
-      fareClass3: 66.0,
+      distanceKm: 4.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 7. NLEX CONNECTOR SEGMENTS (Easytrip)
-    // =========================================================================
+    // 7. NLEX CONNECTOR (Physical Links)
     TollSegment(
-      id: 'seg_nlexc_c3_espana',
+      id: 'seg_nlex_c_c3_espana',
       expressway: 'NLEX-C',
       expresswayName: 'NLEX Connector',
       operator: 'easytrip',
       entryPoint: 'nlex_connector_c3',
       exitPoint: 'nlex_connector_espana',
-      fareClass1: 86.0,
-      fareClass2: 215.0,
-      fareClass3: 258.0,
+      distanceKm: 5.1,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
     TollSegment(
-      id: 'seg_nlexc_espana_magsaysay',
+      id: 'seg_nlex_c_espana_magsaysay',
       expressway: 'NLEX-C',
       expresswayName: 'NLEX Connector',
       operator: 'easytrip',
       entryPoint: 'nlex_connector_espana',
       exitPoint: 'nlex_connector_magsaysay',
-      fareClass1: 33.0,
-      fareClass2: 83.0,
-      fareClass3: 100.0,
+      distanceKm: 2.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 8. SCTEX SEGMENTS (Easytrip)
-    // =========================================================================
+    // 8. SCTEX (Physical Links)
     TollSegment(
       id: 'seg_sctex_subic_dinalupihan',
       expressway: 'SCTEX',
@@ -1937,9 +2818,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_subic_tipo',
       exitPoint: 'sctex_dinalupihan',
-      fareClass1: 68.0,
-      fareClass2: 136.0,
-      fareClass3: 204.0,
+      distanceKm: 12.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1952,9 +2831,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_dinalupihan',
       exitPoint: 'sctex_floridablanca',
-      fareClass1: 54.0,
-      fareClass2: 108.0,
-      fareClass3: 162.0,
+      distanceKm: 14.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1967,9 +2844,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_floridablanca',
       exitPoint: 'sctex_porac',
-      fareClass1: 45.0,
-      fareClass2: 90.0,
-      fareClass3: 135.0,
+      distanceKm: 11.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1982,9 +2857,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_porac',
       exitPoint: 'sctex_clark_south',
-      fareClass1: 40.0,
-      fareClass2: 80.0,
-      fareClass3: 120.0,
+      distanceKm: 9.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -1997,9 +2870,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_clark_south',
       exitPoint: 'sctex_clark_north',
-      fareClass1: 32.0,
-      fareClass2: 64.0,
-      fareClass3: 96.0,
+      distanceKm: 7.4,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2012,9 +2883,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_clark_north',
       exitPoint: 'sctex_dolores',
-      fareClass1: 38.0,
-      fareClass2: 76.0,
-      fareClass3: 114.0,
+      distanceKm: 10.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2027,9 +2896,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_dolores',
       exitPoint: 'sctex_concepcion',
-      fareClass1: 34.0,
-      fareClass2: 68.0,
-      fareClass3: 102.0,
+      distanceKm: 8.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2042,9 +2909,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_concepcion',
       exitPoint: 'sctex_luisita',
-      fareClass1: 42.0,
-      fareClass2: 84.0,
-      fareClass3: 126.0,
+      distanceKm: 11.4,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2057,18 +2922,14 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'sctex_luisita',
       exitPoint: 'sctex_tarlac',
-      fareClass1: 35.0,
-      fareClass2: 70.0,
-      fareClass3: 105.0,
+      distanceKm: 9.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 9. TPLEX SEGMENTS (Autosweep)
-    // =========================================================================
+    // 9. TPLEX (Physical Links)
     TollSegment(
       id: 'seg_tplex_tarlac_victoria',
       expressway: 'TPLEX',
@@ -2076,9 +2937,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_tarlac',
       exitPoint: 'tplex_victoria',
-      fareClass1: 36.0,
-      fareClass2: 72.0,
-      fareClass3: 108.0,
+      distanceKm: 9.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2091,9 +2950,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_victoria',
       exitPoint: 'tplex_pura',
-      fareClass1: 24.0,
-      fareClass2: 48.0,
-      fareClass3: 72.0,
+      distanceKm: 7.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2106,9 +2963,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_pura',
       exitPoint: 'tplex_anao',
-      fareClass1: 28.0,
-      fareClass2: 56.0,
-      fareClass3: 84.0,
+      distanceKm: 6.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2121,9 +2976,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_anao',
       exitPoint: 'tplex_carmen',
-      fareClass1: 58.0,
-      fareClass2: 116.0,
-      fareClass3: 174.0,
+      distanceKm: 14.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2136,9 +2989,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_carmen',
       exitPoint: 'tplex_urdaneta',
-      fareClass1: 62.0,
-      fareClass2: 124.0,
-      fareClass3: 186.0,
+      distanceKm: 13.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2151,9 +3002,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_urdaneta',
       exitPoint: 'tplex_binalonan',
-      fareClass1: 35.0,
-      fareClass2: 70.0,
-      fareClass3: 105.0,
+      distanceKm: 8.4,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2166,9 +3015,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_binalonan',
       exitPoint: 'tplex_pozorrubio',
-      fareClass1: 34.0,
-      fareClass2: 68.0,
-      fareClass3: 102.0,
+      distanceKm: 10.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2181,9 +3028,7 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_pozorrubio',
       exitPoint: 'tplex_sison',
-      fareClass1: 22.0,
-      fareClass2: 44.0,
-      fareClass3: 66.0,
+      distanceKm: 7.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2196,18 +3041,14 @@ class TollService {
       operator: 'autosweep',
       entryPoint: 'tplex_sison',
       exitPoint: 'tplex_rosario',
-      fareClass1: 12.0,
-      fareClass2: 24.0,
-      fareClass3: 36.0,
+      distanceKm: 11.5,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 10. CALAX SEGMENTS (Easytrip)
-    // =========================================================================
+    // 10. CALAX (Physical Links)
     TollSegment(
       id: 'seg_calax_mamplasan_technopark',
       expressway: 'CALAX',
@@ -2215,9 +3056,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'calax_mamplasan',
       exitPoint: 'calax_technopark',
-      fareClass1: 14.0,
-      fareClass2: 28.0,
-      fareClass3: 42.0,
+      distanceKm: 3.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2230,9 +3069,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'calax_technopark',
       exitPoint: 'calax_laguna_blvd',
-      fareClass1: 15.0,
-      fareClass2: 30.0,
-      fareClass3: 45.0,
+      distanceKm: 2.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2245,9 +3082,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'calax_laguna_blvd',
       exitPoint: 'calax_santa_rosa',
-      fareClass1: 18.0,
-      fareClass2: 36.0,
-      fareClass3: 54.0,
+      distanceKm: 3.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2260,9 +3095,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'calax_santa_rosa',
       exitPoint: 'calax_silang_east',
-      fareClass1: 32.0,
-      fareClass2: 64.0,
-      fareClass3: 96.0,
+      distanceKm: 5.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2275,9 +3108,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'calax_silang_east',
       exitPoint: 'calax_silang',
-      fareClass1: 32.0,
-      fareClass2: 64.0,
-      fareClass3: 96.0,
+      distanceKm: 4.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2290,18 +3121,14 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'calax_silang',
       exitPoint: 'calax_gov_drive',
-      fareClass1: 45.0,
-      fareClass2: 90.0,
-      fareClass3: 135.0,
+      distanceKm: 6.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 11. CAVITEX & C5 SOUTH LINK SEGMENTS (Easytrip)
-    // =========================================================================
+    // 11. CAVITEX (Physical Links)
     TollSegment(
       id: 'seg_cavitex_seaside_paranaque',
       expressway: 'CAVITEX',
@@ -2309,9 +3136,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'cavitex_seaside',
       exitPoint: 'cavitex_paranaque',
-      fareClass1: 35.0,
-      fareClass2: 70.0,
-      fareClass3: 105.0,
+      distanceKm: 5.2,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2324,9 +3149,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'cavitex_paranaque',
       exitPoint: 'cavitex_zapote',
-      fareClass1: 0.0,
-      fareClass2: 0.0,
-      fareClass3: 0.0,
+      distanceKm: 4.6,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2339,9 +3162,7 @@ class TollService {
       operator: 'easytrip',
       entryPoint: 'cavitex_zapote',
       exitPoint: 'cavitex_kawit',
-      fareClass1: 73.0,
-      fareClass2: 146.0,
-      fareClass3: 219.0,
+      distanceKm: 7.8,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2350,32 +3171,26 @@ class TollService {
     TollSegment(
       id: 'seg_cavitex_c5_merville_taguig',
       expressway: 'CAVITEX',
-      expresswayName: 'Manila-Cavite Expressway',
+      expresswayName: 'C5 South Link Expressway',
       operator: 'easytrip',
       entryPoint: 'cavitex_c5_merville',
       exitPoint: 'cavitex_c5_taguig',
-      fareClass1: 37.0,
-      fareClass2: 74.0,
-      fareClass3: 111.0,
+      distanceKm: 7.7,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
       lastVerified: DateTime(2026, 8, 19),
     ),
 
-    // =========================================================================
-    // 12. CCLEX SEGMENTS (Visayas / CCLEX - Easytrip compatible)
-    // =========================================================================
+    // 12. CCLEX (Physical Link)
     TollSegment(
-      id: 'seg_cclex_cebu_cordova',
+      id: 'seg_cclex_srp_cordova',
       expressway: 'CCLEX',
       expresswayName: 'Cebu-Cordova Link Expressway',
       operator: 'easytrip',
       entryPoint: 'cclex_cebu_srp',
       exitPoint: 'cclex_cordova',
-      fareClass1: 90.0,
-      fareClass2: 180.0,
-      fareClass3: 270.0,
+      distanceKm: 8.9,
       direction: 'both',
       isActive: true,
       lastUpdated: DateTime(2026, 8, 19),
@@ -2383,137 +3198,36 @@ class TollService {
     ),
   ];
 
-  /// Default predefined corridor routes for backward compatibility.
+  // ===========================================================================
+  // EMBEDDED TOLL CHARGE RULES (TRB OFFICIAL MATRICES & BARRIER RATES)
+  // All editable rates are located in `lib/data/toll_rates_data.dart`
+  // ===========================================================================
+
+  static final List<TollChargeRule> defaultTollRules = tollRatesData;
+
+  // Predefined default routes for quick access
   static final List<RouteModel> defaultRoutes = [
     RouteModel(
-      id: 'sample_route_multi_operator',
-      name: 'Batangas → Bocaue (Multi-Operator Corridor)',
-      origin: 'Batangas City Terminal',
-      destination: 'Bocaue Barrier',
-      segmentIds: const [
-        'seg_star_batangas_ibaan',
-        'seg_star_ibaan_lipa',
-        'seg_star_lipa_malvar',
-        'seg_star_malvar_tanauan',
-        'seg_star_tanauan_stotomas',
-        'seg_slex_stotomas_calamba',
-        'seg_slex_calamba_canlubang',
-        'seg_slex_canlubang_silangan',
-        'seg_slex_silangan_cabuyao',
-        'seg_slex_cabuyao_santarosa',
-        'seg_slex_santarosa_eton',
-        'seg_slex_eton_greenfield',
-        'seg_slex_greenfield_mamplasan',
-        'seg_slex_mamplasan_southwoods',
-        'seg_slex_southwoods_sanpedro',
-        'seg_slex_sanpedro_susana',
-        'seg_slex_susana_filinvest',
+      id: 'route_slex_southbound',
+      name: 'SLEX Southbound',
+      origin: 'slex_alabang',
+      destination: 'slex_calamba',
+      segmentIds: [
         'seg_slex_filinvest_alabang',
-        'seg_skyway_alabang_sucat',
-        'seg_skyway_sucat_bicutan',
-        'seg_skyway_bicutan_naiax',
-        'seg_skyway_naiax_magallanes',
-        'seg_skyway_magallanes_donbosco',
-        'seg_skyway_donbosco_buendia',
-        'seg_skyway_buendia_quirino',
-        'seg_skyway_quirino_nagtahan',
-        'seg_skyway_nagtahan_erodriguez',
-        'seg_skyway_erodriguez_quezonave',
-        'seg_skyway_quezonave_sgtrivera',
-        'seg_skyway_sgtrivera_balintawak',
-        'seg_nlex_balintawak_mindanao',
-        'seg_nlex_mindanao_valenzuela',
-        'seg_nlex_valenzuela_meycauayan',
-        'seg_nlex_meycauayan_marilao',
-        'seg_nlex_marilao_philarena',
-        'seg_nlex_philarena_bocaue',
-      ],
-      lastVerified: DateTime(2026, 8, 19),
-      isActive: true,
-    ),
-    RouteModel(
-      id: 'sample_route_autosweep_only',
-      name: 'Batangas → Balintawak (Autosweep Only)',
-      origin: 'Batangas City Terminal',
-      destination: 'Balintawak Gantry (Skyway)',
-      segmentIds: const [
-        'seg_star_batangas_ibaan',
-        'seg_star_ibaan_lipa',
-        'seg_star_lipa_malvar',
-        'seg_star_malvar_tanauan',
-        'seg_star_tanauan_stotomas',
-        'seg_slex_stotomas_calamba',
-        'seg_slex_calamba_canlubang',
-        'seg_slex_canlubang_silangan',
-        'seg_slex_silangan_cabuyao',
-        'seg_slex_cabuyao_santarosa',
-        'seg_slex_santarosa_eton',
-        'seg_slex_eton_greenfield',
-        'seg_slex_greenfield_mamplasan',
-        'seg_slex_mamplasan_southwoods',
-        'seg_slex_southwoods_sanpedro',
-        'seg_slex_sanpedro_susana',
         'seg_slex_susana_filinvest',
-        'seg_slex_filinvest_alabang',
-        'seg_skyway_alabang_sucat',
-        'seg_skyway_sucat_bicutan',
-        'seg_skyway_bicutan_naiax',
-        'seg_skyway_naiax_magallanes',
-        'seg_skyway_magallanes_donbosco',
-        'seg_skyway_donbosco_buendia',
-        'seg_skyway_buendia_quirino',
-        'seg_skyway_quirino_nagtahan',
-        'seg_skyway_nagtahan_erodriguez',
-        'seg_skyway_erodriguez_quezonave',
-        'seg_skyway_quezonave_sgtrivera',
-        'seg_skyway_sgtrivera_balintawak',
+        'seg_slex_sanpedro_susana',
+        'seg_slex_southwoods_sanpedro',
+        'seg_slex_mamplasan_southwoods',
+        'seg_slex_greenfield_mamplasan',
+        'seg_slex_eton_greenfield',
+        'seg_slex_santarosa_eton',
+        'seg_slex_cabuyao_santarosa',
+        'seg_slex_silangan_cabuyao',
+        'seg_slex_canlubang_silangan',
+        'seg_slex_calamba_canlubang',
       ],
-      lastVerified: DateTime(2026, 8, 19),
       isActive: true,
-    ),
-    RouteModel(
-      id: 'sample_route_easytrip_only',
-      name: 'Balintawak → San Fernando (Easytrip Only)',
-      origin: 'Balintawak Barrier (NLEX)',
-      destination: 'San Fernando Exit',
-      segmentIds: const [
-        'seg_nlex_balintawak_mindanao',
-        'seg_nlex_mindanao_valenzuela',
-        'seg_nlex_valenzuela_meycauayan',
-        'seg_nlex_meycauayan_marilao',
-        'seg_nlex_marilao_philarena',
-        'seg_nlex_philarena_bocaue',
-        'seg_nlex_bocaue_balagtas',
-        'seg_nlex_balagtas_tabang',
-        'seg_nlex_tabang_pulilan',
-        'seg_nlex_pulilan_sansimon',
-        'seg_nlex_sansimon_sanfernando',
-      ],
       lastVerified: DateTime(2026, 8, 19),
-      isActive: true,
     ),
   ];
-
-  /// Seeds plazas & segments into Firestore if empty.
-  Future<void> seedPlaceholderDataIfEmpty() async {
-    for (final plaza in defaultPlazas) {
-      await _firestoreService.tollPlazasRef.doc(plaza.id).set(plaza);
-    }
-    for (final segment in defaultSegments) {
-      await _firestoreService.tollSegmentsRef.doc(segment.id).set(segment);
-    }
-    for (final route in defaultRoutes) {
-      await _firestoreService.routesRef.doc(route.id).set(route);
-    }
-  }
-}
-
-class _GraphEdge {
-  final String targetPlazaId;
-  final TollSegment segment;
-
-  _GraphEdge({
-    required this.targetPlazaId,
-    required this.segment,
-  });
 }

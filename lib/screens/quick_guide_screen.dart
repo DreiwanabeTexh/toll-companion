@@ -86,7 +86,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AeroColors.surfaceCard,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         side: BorderSide(color: AeroColors.border),
       ),
@@ -111,17 +111,17 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
               for (final entry in entries) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.article_outlined,
+                  leading: Icon(Icons.article_outlined,
                       color: AeroColors.neonBlue, size: 20),
                   title: Text(
                     entry.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AeroColors.textPrimary,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
+                  trailing: Icon(Icons.chevron_right,
                       color: AeroColors.textSecondary),
                   onTap: () {
                     Navigator.pop(context);
@@ -133,7 +133,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                     );
                   },
                 ),
-                const Divider(height: 1, color: AeroColors.border),
+                Divider(height: 1, color: AeroColors.border),
               ],
             ],
           ),
@@ -147,7 +147,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
     return Scaffold(
       backgroundColor: AeroColors.surfaceBase,
       // Tier 1 Header with clean no-ring avatar and rotating speech bubble
-      appBar: const AeroTopBar(
+      appBar: AeroTopBar(
         phrases: AeroTopBar.guidePhrases,
       ),
       body: StreamBuilder<List<GuideEntry>>(
@@ -155,7 +155,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
         initialData: _initialEntries,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -192,7 +192,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                         Text(
                           'Couldn\'t load guide entries. Check your connection.\n${snapshot.error}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: AeroColors.textPrimary),
+                          style: TextStyle(color: AeroColors.textPrimary),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -226,10 +226,10 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.menu_book,
+                        Icon(Icons.menu_book,
                             size: 64, color: AeroColors.textSecondary),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'No guide entries available yet',
                           style: TextStyle(
                             fontSize: 18,
@@ -238,7 +238,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Firestore collection "guideEntries" is currently empty.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AeroColors.textSecondary),
@@ -282,7 +282,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
   Widget _buildGuideContent(List<GuideEntry> allEntries, {required bool isOffline}) {
     // Categories with topic-specific icons and accent colors
     final categories = [
-      const _CategoryGroup(
+      _CategoryGroup(
         key: 'rfid',
         title: 'RFID & Tolls',
         description:
@@ -304,7 +304,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
         description:
             'Interchange splits, missed exits, and speed limit rules.',
         icon: Icons.alt_route_rounded,
-        color: const Color(0xFF60A5FA),
+        color: Color(0xFF60A5FA),
       ),
       const _CategoryGroup(
         key: 'safety',
@@ -322,7 +322,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Dedicated Hero Space: Large Mascot Illustration alongside Page Heading
-          const AeroHeroHeaderRow(
+          AeroHeroHeaderRow(
             title: 'Quick Guide',
             subtitle:
                 'Select a category for troubleshooting and assistance.',
@@ -477,7 +477,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AeroColors.surfaceContainer,
                             foregroundColor: AeroColors.textPrimary,
-                            side: const BorderSide(
+                            side: BorderSide(
                               color: AeroColors.outlineVariant,
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -553,7 +553,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(
                 Icons.support_agent_rounded,
@@ -572,7 +572,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Connect directly to official 24/7 expressway patrol dispatchers and support teams.',
             style: TextStyle(
               fontSize: 12,
@@ -599,7 +599,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AeroColors.neonBlue,
-                  side: const BorderSide(color: AeroColors.neonBlue, width: 1.2),
+                  side: BorderSide(color: AeroColors.neonBlue, width: 1.2),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),

@@ -104,7 +104,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
     return Container(
       height: screenHeight * 0.85,
       padding: EdgeInsets.only(bottom: keyboardHeight),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AeroColors.surfaceBase,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         border: Border(
@@ -139,7 +139,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: AeroColors.textSecondary),
+                  icon: Icon(Icons.close, color: AeroColors.textSecondary),
                 ),
               ],
             ),
@@ -157,24 +157,24 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
               child: TextField(
                 controller: _searchController,
                 autofocus: false,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AeroColors.textPrimary,
                   fontSize: 14,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Search exit name, expressway (e.g. SLEX, Lipa)...',
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     color: AeroColors.textSecondary,
                     fontSize: 13,
                   ),
-                  prefixIcon: const Icon(
+                  prefixIcon: Icon(
                     Icons.search,
                     color: AeroColors.neonBlue,
                     size: 20,
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear,
+                          icon: Icon(Icons.clear,
                               color: AeroColors.textSecondary, size: 18),
                           onPressed: () => _searchController.clear(),
                         )
@@ -246,7 +246,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.location_off,
                             color: AeroColors.textSecondary,
                             size: 40,
@@ -258,7 +258,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                                 .copyWith(fontSize: 16),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             'Try searching by another exit name or expressway.',
                             style: TextStyle(
                               color: AeroColors.textSecondary,
@@ -274,7 +274,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
                     itemCount: _filteredPlazas.length,
-                    separatorBuilder: (_, _) => const Divider(
+                    separatorBuilder: (_, _) => Divider(
                       color: AeroColors.border,
                       height: 1,
                     ),
@@ -335,7 +335,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                                             ? FontWeight.bold
                                             : FontWeight.w600,
                                         color: isSelected
-                                            ? Colors.white
+                                            ? AeroColors.neonBlue
                                             : AeroColors.textPrimary,
                                       ),
                                     ),
@@ -346,7 +346,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                                           child: Text(
                                             plaza.expresswayName,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
                                               color: AeroColors.textSecondary,
                                             ),
@@ -364,7 +364,7 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                                               borderRadius:
                                                   BorderRadius.circular(4),
                                             ),
-                                            child: const Text(
+                                            child: Text(
                                               'INTERCHANGE',
                                               style: TextStyle(
                                                 fontSize: 9,
@@ -386,8 +386,8 @@ class _PlazaPickerSheetState extends State<PlazaPickerSheet> {
                                     horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: isAutosweep
-                                      ? const Color(0xFF064E3B).withValues(alpha: 0.5)
-                                      : const Color(0xFF0C4A6E).withValues(alpha: 0.5),
+                                      ? AeroColors.successEmerald.withValues(alpha: 0.15)
+                                      : AeroColors.neonBlue.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
                                     color: isAutosweep

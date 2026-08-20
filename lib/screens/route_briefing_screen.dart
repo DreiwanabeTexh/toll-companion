@@ -3,6 +3,7 @@ import '../models/route_model.dart';
 import '../models/route_briefing.dart';
 import '../services/briefing_service.dart';
 import '../services/toll_service.dart';
+import '../theme.dart';
 
 /// Route Briefing screen (Phase 2).
 ///
@@ -65,8 +66,14 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
     }
 
     return Scaffold(
+      backgroundColor: AeroColors.surfaceBase,
       appBar: AppBar(
-        title: const Text('Route Briefing'),
+        backgroundColor: AeroColors.surfaceBase,
+        title: Text(
+          'Route Briefing',
+          style: TextStyle(color: AeroColors.textPrimary),
+        ),
+        iconTheme: IconThemeData(color: AeroColors.textPrimary),
       ),
       body: StreamBuilder<List<RouteModel>>(
         stream: _routesStream,
@@ -84,21 +91,21 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
               // Route Selector Dropdown
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF141414),
+                decoration: BoxDecoration(
+                  color: AeroColors.surfaceContainerLow,
                   border: Border(
-                    bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1),
+                    bottom: BorderSide(color: AeroColors.border, width: 1),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.route, color: Color(0xFF0088FF), size: 20),
+                    Icon(Icons.route, color: AeroColors.neonBlue, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: routes.isEmpty
-                          ? const Text(
+                          ? Text(
                               'Loading available routes...',
-                              style: TextStyle(color: Color(0xFF8A919F)),
+                              style: TextStyle(color: AeroColors.textSecondary),
                             )
                           : DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
@@ -106,15 +113,15 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
                                     ? _selectedRouteId
                                     : (routes.isNotEmpty ? routes.first.id : null),
                                 isExpanded: true,
-                                dropdownColor: const Color(0xFF1A1A1A),
-                                style: const TextStyle(
+                                dropdownColor: AeroColors.surfaceCard,
+                                style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFFE3E2E2),
+                                  color: AeroColors.textPrimary,
                                 ),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.arrow_drop_down,
-                                  color: Color(0xFF0088FF),
+                                  color: AeroColors.neonBlue,
                                 ),
                                 items: routes.map((r) {
                                   return DropdownMenuItem<String>(
@@ -142,9 +149,9 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
               // Tab Bar Navigation
               TabBar(
                 controller: _tabController,
-                indicatorColor: const Color(0xFF0088FF),
-                labelColor: const Color(0xFF0088FF),
-                unselectedLabelColor: const Color(0xFF8A919F),
+                indicatorColor: AeroColors.neonBlue,
+                labelColor: AeroColors.neonBlue,
+                unselectedLabelColor: AeroColors.textSecondary,
                 indicatorSize: TabBarIndicatorSize.tab,
                 tabs: const [
                   Tab(
@@ -165,10 +172,10 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
               // Briefing Content Canvas
               Expanded(
                 child: _selectedRouteId == null
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'Select a route to view briefing',
-                          style: TextStyle(color: Color(0xFF8A919F)),
+                          style: TextStyle(color: AeroColors.textSecondary),
                         ),
                       )
                     : StreamBuilder<RouteBriefing?>(
@@ -177,16 +184,16 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
-                            return const Center(
+                            return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   CircularProgressIndicator(
-                                      color: Color(0xFF0088FF)),
-                                  SizedBox(height: 16),
+                                      color: AeroColors.neonBlue),
+                                  const SizedBox(height: 16),
                                   Text(
                                     'Loading route briefing...',
-                                    style: TextStyle(color: Color(0xFF8A919F)),
+                                    style: TextStyle(color: AeroColors.textSecondary),
                                   ),
                                 ],
                               ),
@@ -201,13 +208,13 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     const Icon(Icons.error_outline,
-                                        size: 48, color: Color(0xFFFF5252)),
+                                        size: 48, color: AeroColors.errorRed),
                                     const SizedBox(height: 16),
                                     Text(
                                       'Couldn\'t load briefing. Check connection.\n${snapshot.error}',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                          color: Color(0xFFE3E2E2)),
+                                      style: TextStyle(
+                                          color: AeroColors.textPrimary),
                                     ),
                                     const SizedBox(height: 16),
                                     ElevatedButton.icon(
@@ -230,23 +237,23 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.menu_book_outlined,
-                                        size: 64, color: Color(0xFF8A919F)),
+                                    Icon(Icons.menu_book_outlined,
+                                        size: 64, color: AeroColors.textSecondary),
                                     const SizedBox(height: 16),
-                                    const Text(
+                                    Text(
                                       'No briefing for this route yet',
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFFE3E2E2),
+                                        color: AeroColors.textPrimary,
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    const Text(
+                                    Text(
                                       'Firestore collection "routeBriefings" does not have an entry for this route.',
                                       textAlign: TextAlign.center,
                                       style:
-                                          TextStyle(color: Color(0xFF8A919F)),
+                                          TextStyle(color: AeroColors.textSecondary),
                                     ),
                                     const SizedBox(height: 20),
                                     ElevatedButton.icon(
@@ -308,37 +315,37 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
           Container(
             padding: const EdgeInsets.all(14.0),
             decoration: BoxDecoration(
-              color: const Color(0xFF0088FF).withValues(alpha: 0.08),
+              color: AeroColors.neonBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: const Color(0xFF0088FF).withValues(alpha: 0.3),
+                color: AeroColors.neonBlue.withValues(alpha: 0.3),
               ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline,
-                    color: Color(0xFF0088FF), size: 20),
+                Icon(Icons.info_outline,
+                    color: AeroColors.neonBlue, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'ROUTE ADVISORY',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0088FF),
+                          color: AeroColors.neonBlue,
                           letterSpacing: 0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         briefing.generalAdvice,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFFE3E2E2),
+                          color: AeroColors.textPrimary,
                           height: 1.35,
                         ),
                       ),
@@ -352,64 +359,68 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
         ],
 
         if (briefing.laneTips.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.all(32.0),
+              padding: const EdgeInsets.all(32.0),
               child: Text(
                 'No specific lane tips recorded for this route.',
-                style: TextStyle(color: Color(0xFF8A919F)),
+                style: TextStyle(color: AeroColors.textSecondary),
               ),
             ),
           )
         else
           for (final tip in briefing.laneTips) ...[
-            Card(
+            Container(
               margin: const EdgeInsets.only(bottom: 12.0),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0088FF).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _resolveIcon(tip.icon),
-                        color: const Color(0xFF0088FF),
-                        size: 20,
-                      ),
+              decoration: BoxDecoration(
+                color: AeroColors.surfaceCard,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AeroColors.border),
+                boxShadow: AeroGlow.subtleCardGlow,
+              ),
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AeroColors.neonBlue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tip.title,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFE3E2E2),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            tip.description,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF8A919F),
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: Icon(
+                      _resolveIcon(tip.icon),
+                      color: AeroColors.neonBlue,
+                      size: 20,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tip.title,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AeroColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          tip.description,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AeroColors.textSecondary,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -419,12 +430,12 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
 
   Widget _buildRestStopsTab(RouteBriefing briefing) {
     if (briefing.restStops.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32.0),
+          padding: const EdgeInsets.all(32.0),
           child: Text(
             'No rest stops or service plazas listed for this route.',
-            style: TextStyle(color: Color(0xFF8A919F)),
+            style: TextStyle(color: AeroColors.textSecondary),
           ),
         ),
       );
@@ -434,102 +445,106 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
       padding: const EdgeInsets.all(16.0),
       children: [
         for (final stop in briefing.restStops) ...[
-          Card(
+          Container(
             margin: const EdgeInsets.only(bottom: 12.0),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          stop.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE3E2E2),
-                          ),
+            decoration: BoxDecoration(
+              color: AeroColors.surfaceCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AeroColors.border),
+              boxShadow: AeroGlow.subtleCardGlow,
+            ),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        stop.name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AeroColors.textPrimary,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0088FF).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(0xFF0088FF).withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Text(
-                          stop.kilometer,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0088FF),
-                          ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AeroColors.neonBlue.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AeroColors.neonBlue.withValues(alpha: 0.3),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.place_outlined,
-                          size: 15, color: Color(0xFF8A919F)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          stop.location,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF8A919F),
-                          ),
+                      child: Text(
+                        stop.kilometer,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AeroColors.neonBlue,
                         ),
                       ),
-                    ],
-                  ),
-                  if (stop.amenities.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: stop.amenities.map((amenity) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF141414),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0xFF2A2A2A),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(_resolveAmenityIcon(amenity),
-                                  size: 13, color: const Color(0xFF00CC88)),
-                              const SizedBox(width: 4),
-                              Text(
-                                amenity,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFFE3E2E2),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
                     ),
                   ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.place_outlined,
+                        size: 15, color: AeroColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        stop.location,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AeroColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (stop.amenities.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: stop.amenities.map((amenity) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AeroColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AeroColors.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_resolveAmenityIcon(amenity),
+                                size: 13, color: AeroColors.successEmerald),
+                            const SizedBox(width: 4),
+                            Text(
+                              amenity,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: AeroColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -539,12 +554,12 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
 
   Widget _buildExitWarningsTab(RouteBriefing briefing) {
     if (briefing.exitConfusions.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32.0),
+          padding: const EdgeInsets.all(32.0),
           child: Text(
             'No high-confusion exit warnings recorded for this route.',
-            style: TextStyle(color: Color(0xFF8A919F)),
+            style: TextStyle(color: AeroColors.textSecondary),
           ),
         ),
       );
@@ -554,99 +569,99 @@ class _RouteBriefingScreenState extends State<RouteBriefingScreen>
       padding: const EdgeInsets.all(16.0),
       children: [
         for (final exit in briefing.exitConfusions) ...[
-          Card(
+          Container(
             margin: const EdgeInsets.only(bottom: 12.0),
-            shape: RoundedRectangleBorder(
+            decoration: BoxDecoration(
+              color: AeroColors.surfaceCard,
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(
-                color: Color(0xFFFFA000),
+              border: Border.all(
+                color: AeroColors.warningAmber.withValues(alpha: 0.6),
                 width: 1,
               ),
+              boxShadow: AeroGlow.subtleCardGlow,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: AeroColors.warningAmber, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        exit.location,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AeroColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: AeroColors.warningAmber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          color: Color(0xFFFFA000), size: 20),
-                      const SizedBox(width: 8),
+                      const Text(
+                        'Risk: ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AeroColors.warningAmber,
+                        ),
+                      ),
                       Expanded(
                         child: Text(
-                          exit.location,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE3E2E2),
+                          exit.warning,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AeroColors.textPrimary,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFA000).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Risk: ',
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: AeroColors.successEmerald.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tip: ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AeroColors.successEmerald,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          exit.tip,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFFA000),
+                            color: AeroColors.textPrimary,
                           ),
                         ),
-                        Expanded(
-                          child: Text(
-                            exit.warning,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFE3E2E2),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00CC88).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tip: ',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF00CC88),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            exit.tip,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFE3E2E2),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

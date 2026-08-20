@@ -74,7 +74,7 @@ void main() {
       );
 
       expect(result.segments.length, equals(2));
-      expect(result.totalFare, equals(89.0));
+      expect(result.totalFare, equals(57.0));
       expect(result.totalDistanceKm, greaterThan(15.0));
 
       final fuelEstimate = result.calculateFuelEstimate(
@@ -82,7 +82,7 @@ void main() {
       );
 
       expect(fuelEstimate.distanceKm, equals(result.totalDistanceKm));
-      expect(fuelEstimate.tollFare, equals(89.0));
+      expect(fuelEstimate.tollFare, equals(57.0));
       expect(fuelEstimate.estimatedFuelCost, greaterThan(0.0));
       expect(fuelEstimate.totalTripCost, equals(fuelEstimate.tollFare + fuelEstimate.estimatedFuelCost));
     });

@@ -1,53 +1,52 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ⚠️ DEV ONLY: Writes temporarily allowed for local placeholder data seeding.
-    // TODO(deploy): Revert all 'allow write' lines back to 'if false' before any public release.
-
+    // Reference Data: Public read-only access (writes strictly disabled for client SDKs)
     match /tollSegments/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
     match /tollPlazas/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
     match /routes/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
     match /emergencyContacts/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
     match /guideEntries/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
     match /checklistItems/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
     match /routeBriefings/{doc} {
       allow read: if true;
-      allow write: if true; // TODO(deploy): revert to 'if false'
+      allow write: if false;
     }
 
-    // Phase 3: Feedback mechanism — write-only client access for data reports
+    // Phase 3 Feedback Mechanism: Write-only client submissions for community reports
     match /dataReports/{doc} {
       allow create: if true;
       allow read, update, delete: if false;
     }
 
-    // Deny all other collections by default
+    // Default: Deny all other collections
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+

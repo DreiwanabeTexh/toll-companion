@@ -15,11 +15,16 @@ class ChecklistService {
 
   /// Fetches active checklist items ordered by sortOrder.
   Stream<List<ChecklistItem>> getChecklistItems() {
-    return _firestoreService.checklistItemsRef
-        .where('isActive', isEqualTo: true)
-        .orderBy('sortOrder')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+    try {
+      return _firestoreService.checklistItemsRef
+          .where('isActive', isEqualTo: true)
+          .orderBy('sortOrder')
+          .snapshots()
+          .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList())
+          .handleError((_) => defaultChecklistItems);
+    } catch (_) {
+      return Stream.value(defaultChecklistItems);
+    }
   }
 
   /// Default checklist items for offline fallback and initial seeding.

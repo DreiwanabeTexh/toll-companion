@@ -22,27 +22,31 @@ class ContactsService {
   /// Fetches active emergency contacts ordered by sortOrder from Firestore.
   /// Automatically writes successful reads to local cache for offline resilience.
   Stream<List<EmergencyContact>> getEmergencyContacts() {
-    return _firestoreService.emergencyContactsRef
-        .where('isActive', isEqualTo: true)
-        .orderBy('sortOrder')
-        .snapshots()
-        .map((snapshot) {
-      final contacts = snapshot.docs.map((doc) => doc.data()).map((contact) {
-        // Upgrade any obsolete placeholder data from prior sessions
-        if (contact.phoneNumber == '0000000000' || !contact.isVerified) {
-          final matched = defaultContacts.firstWhere(
-            (d) => d.id == contact.id,
-            orElse: () => contact,
-          );
-          return matched;
+    try {
+      return _firestoreService.emergencyContactsRef
+          .where('isActive', isEqualTo: true)
+          .orderBy('sortOrder')
+          .snapshots()
+          .map((snapshot) {
+        final contacts = snapshot.docs.map((doc) => doc.data()).map((contact) {
+          // Upgrade any obsolete placeholder data from prior sessions
+          if (contact.phoneNumber == '0000000000' || !contact.isVerified) {
+            final matched = defaultContacts.firstWhere(
+              (d) => d.id == contact.id,
+              orElse: () => contact,
+            );
+            return matched;
+          }
+          return contact;
+        }).toList();
+        if (contacts.isNotEmpty) {
+          _cacheService.saveEmergencyContacts(contacts);
         }
-        return contact;
-      }).toList();
-      if (contacts.isNotEmpty) {
-        _cacheService.saveEmergencyContacts(contacts);
-      }
-      return contacts;
-    });
+        return contacts;
+      }).handleError((_) => defaultContacts);
+    } catch (_) {
+      return Stream.value(defaultContacts);
+    }
   }
 
   /// Retrieves locally cached emergency contacts if offline.

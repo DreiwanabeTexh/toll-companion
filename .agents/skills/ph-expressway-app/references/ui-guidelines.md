@@ -82,7 +82,7 @@ To prevent driver misinformation, all data-driven content (Emergency hotlines, T
 
 ### Typography Scale (Inter — Refined Balanced Automotive Values)
 
-- **`displayLg`**: **`36px` / Weight 800 / `#0088FF`** (Autosweep & EasyTrip RFID balance amounts on Home)
+- **`displayLg`**: **`36px` / Weight 800 / `#0088FF`** (Autosweep & EasyTrip RFID balance amounts on Home in Electric Blue)
 - **`displayFare`**: **`34px` / Weight 800 / `#0088FF`** (Estimated Total Fare on Toll Calculator)
 - **`displayHero`**: **`36px` / Weight 800 / `#FFFFFF`** (Page hero headings: `"Emergency"`, `"Quick Guide"`)
 - **`headlineLg`**: **`32px` / Weight 800 / `#FFFFFF`** (`"Trip Details"` on Toll Calculator)
@@ -95,12 +95,16 @@ To prevent driver misinformation, all data-driven content (Emergency hotlines, T
 
 ---
 
-## 🧭 Navigation Architecture: Persistent Bottom Tab Bar
+## 🧭 Navigation Architecture: Persistent Bottom Tab Bar & Tab Motion
 
-1. **🏠 Home** (`Icons.home`): Dashboard with animated mascot hero card, 36px balance numbers, and recent routes.
-2. **💳 Tolls** (`Icons.payments`): Exit-to-Exit Toll Routing Engine with Searchable Plaza Picker, animated mascot hero, 34px total fare display, strict operator subtotals, trust verification badge, and report action.
-3. **🚨 Emergency** (`Icons.emergency`): Hero header with animated mascot alongside "Emergency" heading + Tier 1 Hotlines with verification badges, report action, and 56px glowing "CALL NOW" buttons.
-4. **🧭 Guide** (`Icons.explore`): Hero header with animated mascot alongside "Quick Guide" heading + Expandable accordion troubleshooting guide.
+1. **State-Preserving Transitions (`_FadeIndexedStack`)**:
+   - Tab switching uses a custom hardware-accelerated crossfade & subtle vertical slide (200ms duration, `Curves.easeOutCubic`).
+   - Keeps all 4 tab states completely intact across switches (active exit selections, calculated fares, scroll positions, form entries).
+2. **Tab Hierarchy**:
+   - **🏠 Home** (`Icons.home`): Driver dashboard with animated hero mascot card ("Expressway Radar Active"), Toll Balances cards (Autosweep & EasyTrip RFID), and genuine Recent Routes history (with honest empty state).
+   - **💳 Tolls** (`Icons.payments`): Exit-to-Exit Toll Routing Engine with Searchable Plaza Picker, animated mascot hero, 34px total fare display, strict operator subtotals, trust verification badge, and report action.
+   - **🚨 Emergency** (`Icons.emergency`): Hero header with animated mascot alongside "Emergency" heading + Tier 1 Hotlines with verification badges, report action, and 56px glowing "CALL NOW" buttons.
+   - **🧭 Guide** (`Icons.explore`): Hero header with animated mascot alongside "Quick Guide" heading + Expandable accordion troubleshooting guide.
 
 ---
 
@@ -127,4 +131,57 @@ The Toll Calculator utilizes an interactive search-based exit picker allowing mo
 - **Estimated Total Fare Card**: Electric blue 34px `displayFare`, corridor breadcrumb chip chain (`STAR → SLEX → Skyway → NLEX`), trust verification indicator.
 - **Operator Breakdown Cards**: Independent Autosweep RFID and Easytrip RFID subtotal containers with strict mathematical separation.
 - **Traversed Segments Accordion**: Tap-to-expand list showing per-segment entry/exit points, expressway tags, and vehicle class fare rates.
+
+---
+
+## 🚀 First-Run Onboarding Flow (Phase 5 Standard)
+
+Aero implements a seamless first-run onboarding sequence with zero cloud dependencies:
+
+```
+[Cold Start] ──► [Splash Screen (~2.5s)] ──┬──► (First Launch) ──────► [Get Started] ──► [Name Input] ──► [Home Dashboard]
+                                           └──► (Subsequent Launch) ──────────────────────────────────► [Home Dashboard]
+```
+
+### 1. Animated Splash Screen (`SplashScreen`)
+- **Animation Motion**: Native aerodynamic entrance sequence (~2.5s total duration):
+  - **Swoop-in (0–44%, ~1.1s)**: Mascot enters from left offscreen with aerodynamic oscillation and wing flaps.
+  - **Plop Landing (44–56%, ~0.3s)**: Comedic bounce-drop landing with impact squash/stretch physics.
+  - **Settle Phase (56–68%, ~0.3s)**: Mascot rebounds smoothly into upright posture.
+  - **Proud Perch & Brand Reading (68–100%, ~0.8s)**: Mascot perches steadily as "AERO" title and tagline remain fully legible.
+- **Skip Control**: Tapping anywhere skips the animation immediately.
+- **First-Run Gate**: Reads `onboarding_complete` flag from `SharedPreferences`.
+
+### 2. Get Started Screen (`GetStartedScreen`)
+- **Visual Hero**: High-resolution expressway skyway scene (`assets/images/get_started_illustration.png`).
+- **Tagline**: *"Your companion for every PH expressway trip — tolls, safety, and peace of mind."*
+- **Feature Highlights**: RFID Tracking, 24/7 Hotlines, Trip Fares.
+- **Action**: Bouncy "Get Started" CTA button leading to Name Input.
+
+### 3. Name Input Screen (`NameInputScreen`)
+- **Heading**: *"What should we call you?"*
+- **Mandatory Entry**: Single auto-focused input field with capitalization; "Continue" button is strictly disabled until non-empty input is entered (no skip option).
+- **Persistence**: Saves `driver_name` (e.g. "Alex") and sets `onboarding_complete = true` via `CacheService`.
+
+### 4. Dynamic Greeting, Settings & App Reset
+- **Dashboard Greeting**: `HomeScreen` reads saved name to display `"Hello, [driver_name]"` (defaults to `"Hello, Driver"`).
+- **Settings Editor**: Users can change their saved driver name anytime via the Settings modal (`AeroHomeAppBar._showSettingsDialog`), which updates the greeting dynamically without restarting the app.
+- **Reset App Action**: Testing/QA tool in Settings modal with confirmation dialog. Wipes all `SharedPreferences` state (`CacheService.clearAll()`) and restarts the flow from `/splash`, re-triggering first-run onboarding.
+
+---
+
+## 📊 Home Dashboard & Toll Balances Pattern
+
+- **Toll Balance Cards**:
+  - Full-width dark cards for **Autosweep RFID** and **EasyTrip RFID** with local tracking support.
+  - **Electric Blue Figures**: The peso amounts (e.g., `₱1,250.00`) are rendered in Electric Blue (`#0088FF`, `AeroColors.neonBlue`).
+  - **Action Buttons in Bottom Row**:
+    - **EDIT** button: Electric Blue text & icon (`#0088FF`) with Electric Blue outline border.
+    - **TOP UP** button: Electric Blue text (`#0088FF`) with Electric Blue outline border.
+  - **Status Chips**: Semantic status indicators (`Active` in Emerald / `Low Balance` in Amber / `Depleted` in Red) on the bottom-left.
+- **Genuine Recent Routes**:
+  - **Empty State**: When no routes have been calculated, renders an honest empty state (`Icons.alt_route`, *"No routes calculated yet"*, *"Calculate any exit-to-exit corridor fare in the Tolls tab to save your trip history here."*, and a *"Plan a Trip"* action button).
+  - **Populated State**: Automatically records calculated trips when motorists calculate fares in the Toll Calculator, allowing 1-tap route recalculation with origin → destination, fare, vehicle class, and favorite star toggle.
+
+
 

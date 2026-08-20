@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/toll_plaza.dart';
 import '../models/toll_segment.dart';
+import '../models/toll_charge_rule.dart';
 import '../models/route_model.dart';
 import '../models/emergency_contact.dart';
 import '../models/guide_entry.dart';
@@ -13,6 +14,7 @@ import '../models/data_report.dart';
 /// Follows collection definitions in data-model.md:
 /// - `tollPlazas` (Phase 4 exit graph)
 /// - `tollSegments`
+/// - `tollChargeRules`
 /// - `routes`
 /// - `emergencyContacts`
 /// - `guideEntries`
@@ -38,6 +40,12 @@ class FirestoreService {
       _firestore.collection('tollSegments').withConverter<TollSegment>(
             fromFirestore: (snapshot, _) => TollSegment.fromFirestore(snapshot),
             toFirestore: (segment, _) => segment.toFirestore(),
+          );
+
+  CollectionReference<TollChargeRule> get tollChargeRulesRef =>
+      _firestore.collection('tollChargeRules').withConverter<TollChargeRule>(
+            fromFirestore: (snapshot, _) => TollChargeRule.fromFirestore(snapshot),
+            toFirestore: (rule, _) => rule.toFirestore(),
           );
 
   CollectionReference<RouteModel> get routesRef =>

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/toll_plaza.dart';
-import '../models/toll_segment.dart';
 import '../models/route_result.dart';
 import '../models/fuel_estimate.dart';
 import '../models/recent_trip.dart';
@@ -28,6 +27,7 @@ class TollCalculatorScreen extends StatefulWidget {
   final String? initialOriginPlazaId;
   final String? initialDestinationPlazaId;
   final int? initialVehicleClass;
+  final bool? initialUseSkyway;
 
   const TollCalculatorScreen({
     super.key,
@@ -37,6 +37,7 @@ class TollCalculatorScreen extends StatefulWidget {
     this.initialOriginPlazaId,
     this.initialDestinationPlazaId,
     this.initialVehicleClass,
+    this.initialUseSkyway,
   });
 
   @override
@@ -52,6 +53,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
   TollPlaza? _originPlaza;
   TollPlaza? _destinationPlaza;
   int _selectedVehicleClass = 1;
+  bool _useSkyway = true;
 
   RouteResult? _routeResult;
   bool _isCalculating = false;
@@ -78,12 +80,16 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     if (widget.initialVehicleClass != null) {
       _selectedVehicleClass = widget.initialVehicleClass!;
     }
+    if (widget.initialUseSkyway != null) {
+      _useSkyway = widget.initialUseSkyway!;
+    }
     _fuelPriceController =
         TextEditingController(text: _customFuelPrice.toStringAsFixed(2));
     _fuelEfficiencyController =
         TextEditingController(text: _customFuelEfficiency.toStringAsFixed(1));
     _loadUserBalances();
     _loadFuelPreferences();
+    _loadSkywayPreference();
     _initializeDefaultRoute();
   }
 
@@ -92,6 +98,19 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     _fuelPriceController.dispose();
     _fuelEfficiencyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSkywayPreference() async {
+    final pref = await _cacheService.getUseSkyway();
+    if (mounted) {
+      setState(() {
+        _useSkyway = pref;
+      });
+    }
+  }
+
+  void _saveSkywayPreference(bool val) {
+    _cacheService.saveUseSkyway(val);
   }
 
   Future<void> _loadFuelPreferences() async {
@@ -151,7 +170,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     }
   }
 
-  void _calculateFare() {
+  Future<void> _calculateFare() async {
     if (_originPlaza == null || _destinationPlaza == null) return;
     _loadUserBalances();
 
@@ -160,6 +179,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         originPlazaId: _originPlaza!.id,
         destinationPlazaId: _destinationPlaza!.id,
         vehicleClass: _selectedVehicleClass,
+        useSkyway: _useSkyway,
       );
 
       setState(() {
@@ -185,8 +205,9 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
           corridors: corridors,
           timestamp: DateTime.now(),
           isFavorite: false,
+          useSkyway: _useSkyway,
         );
-        _cacheService.addRecentTrip(trip);
+        await _cacheService.addRecentTrip(trip);
       }
     } catch (e) {
       setState(() {
@@ -242,7 +263,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AeroColors.surfaceBase,
-      appBar: const AeroTopBar(
+      appBar: AeroTopBar(
         phrases: AeroTopBar.travelPhrases,
       ),
       body: StreamBuilder<List<TollPlaza>>(
@@ -255,7 +276,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
             children: [
               // Hero Row: Mascot Alongside Trip Details Heading
-              const AeroHeroHeaderRow(
+              AeroHeroHeaderRow(
                 title: 'Trip Details',
                 subtitle: 'Search origin & destination exits across PH expressways',
                 mascotSize: 84,
@@ -265,6 +286,11 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
 
               // Exit-to-Exit Search & Route Selector Card
               _buildExitPickerCard(plazas),
+
+              const SizedBox(height: 16),
+
+              // Skyway Route Option Toggle (Elevated vs At-Grade SLEX)
+              _buildSkywayOptionToggle(),
 
               const SizedBox(height: 16),
 
@@ -374,7 +400,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'ORIGIN EXIT',
                           style: TextStyle(
                             fontSize: 10,
@@ -392,14 +418,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: _originPlaza != null
-                                ? Colors.white
+                                ? AeroColors.textPrimary
                                 : AeroColors.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.search, size: 20, color: AeroColors.neonBlue),
+                  Icon(Icons.search, size: 20, color: AeroColors.neonBlue),
                 ],
               ),
             ),
@@ -427,7 +453,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                       borderRadius: BorderRadius.circular(9999),
                       border: Border.all(color: AeroColors.border),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.swap_vert, size: 16, color: AeroColors.neonBlue),
@@ -475,7 +501,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'DESTINATION EXIT',
                           style: TextStyle(
                             fontSize: 10,
@@ -493,17 +519,123 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: _destinationPlaza != null
-                                ? Colors.white
+                                ? AeroColors.textPrimary
                                 : AeroColors.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.search, size: 20, color: AeroColors.neonBlue),
+                  Icon(Icons.search, size: 20, color: AeroColors.neonBlue),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkywayOptionToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AeroColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _useSkyway
+              ? AeroColors.neonBlue.withValues(alpha: 0.35)
+              : AeroColors.border,
+        ),
+        boxShadow: _useSkyway ? AeroGlow.subtleCardGlow : null,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _useSkyway
+                  ? AeroColors.neonBlue.withValues(alpha: 0.15)
+                  : AeroColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _useSkyway
+                    ? AeroColors.neonBlue.withValues(alpha: 0.35)
+                    : AeroColors.border,
+              ),
+            ),
+            child: Icon(
+              _useSkyway ? Icons.flight_takeoff : Icons.directions_car,
+              color: _useSkyway ? AeroColors.neonBlue : AeroColors.textSecondary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 2,
+                  children: [
+                    Text(
+                      _useSkyway ? 'Via Skyway (Elevated)' : 'SLEX At-Grade (Surface)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AeroColors.textPrimary,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: _useSkyway
+                            ? AeroColors.neonBlue.withValues(alpha: 0.15)
+                            : AeroColors.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _useSkyway ? 'FASTER' : 'LOWER TOLL',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w800,
+                          color: _useSkyway
+                              ? AeroColors.neonBlue
+                              : AeroColors.textSecondary,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _useSkyway
+                      ? 'Includes Skyway Stages 1–3 elevated tolls'
+                      : 'Ground level route (avoids elevated Skyway tolls)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AeroColors.textMuted,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch.adaptive(
+            value: _useSkyway,
+            activeTrackColor: AeroColors.neonBlue,
+            onChanged: (val) {
+              setState(() {
+                _useSkyway = val;
+              });
+              _saveSkywayPreference(val);
+              _calculateFare();
+            },
           ),
         ],
       ),
@@ -514,7 +646,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'VEHICLE CLASSIFICATION',
           style: TextStyle(
             fontSize: 11.5,
@@ -638,7 +770,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AeroColors.border),
       ),
-      child: const Center(
+      child: Center(
         child: Text(
           'Origin and Destination exits are identical. Fare: ₱0.00',
           style: TextStyle(
@@ -672,7 +804,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         const SizedBox(height: 16),
 
         // 3. Per-Operator Subtotal Breakdown Cards
-        const Text(
+        Text(
           'RFID OPERATOR BREAKDOWN',
           style: TextStyle(
             fontSize: 11.5,
@@ -759,9 +891,9 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                             (result.fareByOperator['autosweep'] ?? 0.0))
                                 ? 'Autosweep balance (₱${_userAutosweepBalance?.toStringAsFixed(2)}) is less than required toll (₱${(result.fareByOperator['autosweep'] ?? 0.0).toStringAsFixed(2)}). Top up before entering!'
                                 : 'Easytrip balance (₱${_userEasytripBalance?.toStringAsFixed(2)}) is less than required toll (₱${(result.fareByOperator['easytrip'] ?? 0.0).toStringAsFixed(2)}). Top up before entering!',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white,
+                          color: AeroColors.textPrimary,
                           height: 1.35,
                         ),
                       ),
@@ -775,8 +907,8 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
 
         const SizedBox(height: 16),
 
-        // 4. Traversed Segments Accordion List
-        _buildSegmentsList(result.segments),
+        // 4. Itemized Toll Charges & Route Segments Accordion List
+        _buildTollChargesAndSegmentsList(result),
 
         const SizedBox(height: 16),
 
@@ -788,7 +920,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AeroColors.border),
           ),
-          child: const Row(
+          child: Row(
             children: [
               Icon(Icons.lightbulb_outline, size: 20, color: AeroColors.neonBlue),
               SizedBox(width: 12),
@@ -826,7 +958,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
               },
             ),
             borderRadius: BorderRadius.circular(6),
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -875,17 +1007,22 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                _fuelEstimatorEnabled
-                    ? 'TOTAL ESTIMATED TRIP COST'
-                    : 'ESTIMATED TOLL FARE',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AeroColors.textSecondary,
-                  letterSpacing: 0.8,
+              Expanded(
+                child: Text(
+                  _fuelEstimatorEnabled
+                      ? 'TOTAL ESTIMATED TRIP COST'
+                      : 'ESTIMATED TOLL FARE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AeroColors.textSecondary,
+                    letterSpacing: 0.8,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               _buildVerificationBadge(result),
             ],
           ),
@@ -910,7 +1047,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
               ),
               if (_fuelEstimatorEnabled) ...[
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   '(Toll + Fuel)',
                   style: TextStyle(
                     fontSize: 12,
@@ -943,7 +1080,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
                                 Icon(Icons.toll_outlined,
                                     size: 13, color: AeroColors.neonBlue),
@@ -962,10 +1099,10 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                             const SizedBox(height: 3),
                             Text(
                               '₱${result.totalFare.toStringAsFixed(2)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: AeroColors.textPrimary,
                               ),
                             ),
                           ],
@@ -983,12 +1120,12 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(Icons.local_gas_station_outlined,
+                                  const Icon(Icons.local_gas_station_outlined,
                                       size: 13,
                                       color: AeroColors.secondaryOrange),
-                                  SizedBox(width: 4),
+                                  const SizedBox(width: 4),
                                   Text(
                                     'EST. FUEL',
                                     style: TextStyle(
@@ -1003,10 +1140,10 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                               const SizedBox(height: 3),
                               Text(
                                 '₱${fuelEstimate.estimatedFuelCost.toStringAsFixed(2)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AeroColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -1025,12 +1162,12 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(Icons.route_outlined,
+                                  const Icon(Icons.route_outlined,
                                       size: 13,
                                       color: AeroColors.emeraldGreen),
-                                  SizedBox(width: 4),
+                                  const SizedBox(width: 4),
                                   Text(
                                     'DISTANCE',
                                     style: TextStyle(
@@ -1045,10 +1182,10 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                               const SizedBox(height: 3),
                               Text(
                                 '~${result.totalDistanceKm.toStringAsFixed(0)} km',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AeroColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -1088,7 +1225,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                     children: [
                       Text(
                         'Toll: ${fuelEstimate.tollSharePercentage.toStringAsFixed(0)}%',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: AeroColors.neonBlue,
@@ -1110,10 +1247,11 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
             const SizedBox(height: 12),
           ],
 
-          // Route Corridor Breadcrumb Chips
+          // Route Corridor Breadcrumb Chips + Skyway Indicator Badge
           Wrap(
             spacing: 6,
             runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (int i = 0; i < traversedExpressways.length; i++) ...[
                 Container(
@@ -1126,19 +1264,56 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                   ),
                   child: Text(
                     traversedExpressways[i],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AeroColors.textPrimary,
                     ),
                   ),
                 ),
                 if (i < traversedExpressways.length - 1)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
+                  Padding(
+                    padding: EdgeInsets.only(top: 1),
                     child: Icon(Icons.arrow_forward,
                         size: 12, color: AeroColors.textSecondary),
                   ),
+              ],
+              if (traversedExpressways.contains('SKYWAY') || traversedExpressways.contains('SLEX')) ...[
+                const SizedBox(width: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: _useSkyway
+                        ? AeroColors.neonBlue.withValues(alpha: 0.15)
+                        : AeroColors.emeraldGreen.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _useSkyway
+                          ? AeroColors.neonBlue.withValues(alpha: 0.35)
+                          : AeroColors.emeraldGreen.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _useSkyway ? Icons.flight_takeoff : Icons.directions_car,
+                        size: 11,
+                        color: _useSkyway ? AeroColors.neonBlue : AeroColors.emeraldGreen,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        _useSkyway ? 'VIA SKYWAY' : 'AT-GRADE',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: _useSkyway ? AeroColors.neonBlue : AeroColors.emeraldGreen,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
@@ -1192,18 +1367,18 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Gas & Fuel Estimator',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.white,
+                                    color: AeroColors.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${_customFuelEfficiency.toStringAsFixed(1)} km/L • ₱${_customFuelPrice.toStringAsFixed(2)}/L',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
                                     color: AeroColors.textSecondary,
                                   ),
@@ -1230,7 +1405,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                   scale: 0.85,
                   child: Switch(
                     value: _fuelEstimatorEnabled,
-                    activeColor: AeroColors.secondaryOrange,
+                    activeThumbColor: AeroColors.secondaryOrange,
                     onChanged: (val) {
                       setState(() {
                         _fuelEstimatorEnabled = val;
@@ -1245,14 +1420,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
 
           // Expanded Content Area
           if (_isFuelSettingsExpanded) ...[
-            const Divider(height: 1, color: AeroColors.border),
+            Divider(height: 1, color: AeroColors.border),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. Quick Presets
-                  const Text(
+                  Text(
                     'CAR TYPE (AUTO-FILLS KM/L)',
                     style: TextStyle(
                       fontSize: 10.5,
@@ -1287,7 +1462,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                   const SizedBox(height: 16),
 
                   // 2. Direct Manual Input Numbers
-                  const Text(
+                  Text(
                     'MANUAL INPUTS (EDIT ANYTIME)',
                     style: TextStyle(
                       fontSize: 10.5,
@@ -1305,7 +1480,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'KM / LITER',
                               style: TextStyle(
                                 fontSize: 10,
@@ -1319,14 +1494,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                       decimal: true),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: AeroColors.textPrimary,
                               ),
                               decoration: InputDecoration(
                                 suffixText: ' km/L',
-                                suffixStyle: const TextStyle(
+                                suffixStyle: TextStyle(
                                   color: AeroColors.textSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -1339,12 +1514,12 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide:
-                                      const BorderSide(color: AeroColors.border),
+                                      BorderSide(color: AeroColors.border),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide:
-                                      const BorderSide(color: AeroColors.border),
+                                      BorderSide(color: AeroColors.border),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
@@ -1374,7 +1549,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'GAS PRICE',
                               style: TextStyle(
                                 fontSize: 10,
@@ -1388,10 +1563,10 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                       decimal: true),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: AeroColors.textPrimary,
                               ),
                               decoration: InputDecoration(
                                 prefixText: '₱ ',
@@ -1401,7 +1576,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                   fontSize: 14,
                                 ),
                                 suffixText: ' /L',
-                                suffixStyle: const TextStyle(
+                                suffixStyle: TextStyle(
                                   color: AeroColors.textSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -1414,12 +1589,12 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide:
-                                      const BorderSide(color: AeroColors.border),
+                                      BorderSide(color: AeroColors.border),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide:
-                                      const BorderSide(color: AeroColors.border),
+                                      BorderSide(color: AeroColors.border),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
@@ -1449,7 +1624,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                   // Friendly Helper Note
                   Row(
                     children: [
-                      const Icon(Icons.info_outline,
+                      Icon(Icons.info_outline,
                           size: 13, color: AeroColors.textSecondary),
                       const SizedBox(width: 6),
                       Expanded(
@@ -1590,10 +1765,10 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
               Expanded(
                 child: Text(
                   operatorName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: AeroColors.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1615,7 +1790,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
           const SizedBox(height: 2),
           Text(
             segmentCount == 1 ? '1 segment' : '$segmentCount segments',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               color: AeroColors.textSecondary,
             ),
@@ -1654,7 +1829,10 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
 
   bool _isSegmentsExpanded = false;
 
-  Widget _buildSegmentsList(List<TollSegment> segments) {
+  Widget _buildTollChargesAndSegmentsList(RouteResult result) {
+    final charges = result.tollCharges;
+    final segments = result.segments;
+
     return Container(
       decoration: BoxDecoration(
         color: AeroColors.surfaceContainer,
@@ -1679,16 +1857,20 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Traversed Segments (${segments.length})',
-                          style: const TextStyle(
+                          charges.isNotEmpty
+                              ? 'Itemized Toll Charges (${charges.length})'
+                              : 'Traversed Segments (${segments.length})',
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                            color: AeroColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          'Tap to view individual toll gantry rates',
+                        Text(
+                          charges.isNotEmpty
+                              ? 'Official TRB rates and road corridor breakdown'
+                              : 'Tap to view physical road segments',
                           style: TextStyle(fontSize: 11, color: AeroColors.textSecondary),
                         ),
                       ],
@@ -1703,66 +1885,214 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
             ),
           ),
           if (_isSegmentsExpanded) ...[
-            const Divider(color: AeroColors.border, height: 1),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              itemCount: segments.length,
-              separatorBuilder: (_, _) => const Divider(
-                color: AeroColors.border,
-                height: 1,
-              ),
-              itemBuilder: (context, index) {
-                final segment = segments[index];
-                final fare = _selectedVehicleClass == 2
-                    ? segment.fareClass2
-                    : _selectedVehicleClass == 3
-                        ? segment.fareClass3
-                        : segment.fareClass1;
+            Divider(color: AeroColors.border, height: 1),
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AeroColors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          segment.expressway,
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w800,
-                            color: AeroColors.primaryTint,
+            // Warnings if any
+            if (result.warnings.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: result.warnings.map((w) => Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      color: AeroColors.warningAmber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AeroColors.warningAmber.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 14, color: AeroColors.warningAmber),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            w,
+                            style: TextStyle(fontSize: 10.5, color: AeroColors.textPrimary),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${segment.entryPoint} → ${segment.exitPoint}',
-                          style: const TextStyle(
-                            fontSize: 12,
+                      ],
+                    ),
+                  )).toList(),
+                ),
+              ),
+              Divider(color: AeroColors.border, height: 1),
+            ],
+
+            // Itemized Toll Charges List
+            if (charges.isNotEmpty) ...[
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                itemCount: charges.length,
+                separatorBuilder: (_, _) => Divider(
+                  color: AeroColors.border,
+                  height: 1,
+                ),
+                itemBuilder: (context, index) {
+                  final charge = charges[index];
+                  final isAutosweep = charge.operator.toLowerCase() == 'autosweep';
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: isAutosweep
+                                ? AeroColors.successEmerald.withValues(alpha: 0.15)
+                                : AeroColors.neonBlue.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: isAutosweep
+                                  ? AeroColors.successEmerald.withValues(alpha: 0.4)
+                                  : AeroColors.neonBlue.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            charge.expressway,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: isAutosweep ? AeroColors.successEmerald : AeroColors.neonBlue,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                charge.explanation,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AeroColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${charge.sourceName} • ${charge.operator.toUpperCase()}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AeroColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '₱${charge.amount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                             color: AeroColors.textPrimary,
                           ),
                         ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AeroColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AeroColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 13, color: AeroColors.neonBlue),
+                          SizedBox(width: 6),
+                          Text(
+                            'Toll estimate based on TRB rate matrices',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AeroColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        '₱${fare.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                        'Rates last updated: ${result.ratesLastUpdated != null ? '${result.ratesLastUpdated!.month.toString().padLeft(2, '0')}/${result.ratesLastUpdated!.year}' : '08/2024'}\nActual toll may vary. Check official advisories.',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AeroColors.textSecondary,
+                          height: 1.35,
                         ),
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ] else ...[
+              // Fallback physical segments list
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                itemCount: segments.length,
+                separatorBuilder: (_, _) => Divider(
+                  color: AeroColors.border,
+                  height: 1,
+                ),
+                itemBuilder: (context, index) {
+                  final segment = segments[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AeroColors.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            segment.expressway,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: AeroColors.primaryTint,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${segment.entryPoint} → ${segment.exitPoint}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AeroColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${segment.effectiveDistanceKm.toStringAsFixed(1)} km',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AeroColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
         ],
       ),
@@ -1770,55 +2100,28 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
   }
 
   Widget _buildVerificationBadge(RouteResult result) {
-    if (result.latestVerificationDate != null) {
-      final month = result.latestVerificationDate!.month.toString().padLeft(2, '0');
-      final year = (result.latestVerificationDate!.year % 100).toString().padLeft(2, '0');
-
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: AeroColors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(9999),
-          border: Border.all(color: AeroColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.verified, size: 12, color: AeroColors.neonBlue),
-            const SizedBox(width: 4),
-            Text(
-              'Fare as of $month/$year',
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: AeroColors.textMuted,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final dateStr = result.ratesLastUpdated != null
+        ? '${result.ratesLastUpdated!.month.toString().padLeft(2, '0')}/${result.ratesLastUpdated!.year}'
+        : '08/2024';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AeroColors.warningAmber.withValues(alpha: 0.15),
+        color: AeroColors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(9999),
-        border: Border.all(
-          color: AeroColors.warningAmber.withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: AeroColors.border),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.warning_amber_rounded, size: 12, color: AeroColors.warningAmber),
-          SizedBox(width: 4),
+          Icon(Icons.receipt_long_outlined, size: 12, color: AeroColors.neonBlue),
+          const SizedBox(width: 4),
           Text(
-            'NOT YET VERIFIED',
+            'TRB Matrix ($dateStr)',
             style: TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AeroColors.warningAmber,
+              fontWeight: FontWeight.w600,
+              color: AeroColors.textSecondary,
             ),
           ),
         ],
@@ -1840,14 +2143,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AeroColors.border),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.checklist, size: 18, color: AeroColors.neonBlue),
                   SizedBox(width: 6),
                   Text(
                     'Pre-Trip Checklist',
-                    style: TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 11.5, color: AeroColors.textPrimary, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -1869,14 +2172,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AeroColors.border),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.menu_book, size: 18, color: AeroColors.neonBlue),
                   SizedBox(width: 6),
                   Text(
                     'Route Briefing',
-                    style: TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 11.5, color: AeroColors.textPrimary, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),

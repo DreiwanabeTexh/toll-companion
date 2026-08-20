@@ -73,6 +73,11 @@ void main() {
       expect(balances['easytrip'], 840.50);
     });
 
+    test('getRecentTrips returns empty list when uninitialized (no fake routes)', () async {
+      final trips = await cacheService.getRecentTrips();
+      expect(trips, isEmpty);
+    });
+
     test('saveRfidBalances updates and persists values', () async {
       await cacheService.saveRfidBalances(autosweep: 2500.0, easytrip: 150.0);
       final balances = await cacheService.getRfidBalances();
@@ -144,38 +149,70 @@ void main() {
       trips = await cacheService.getRecentTrips();
       expect(trips.firstWhere((t) => t.id == 'fav_test').isFavorite, isFalse);
     });
+
+    test('clearAll wipes all preferences', () async {
+      await cacheService.setDriverName('Juan');
+      await cacheService.setOnboardingComplete(true);
+      await cacheService.saveRfidBalances(autosweep: 500, easytrip: 300);
+
+      expect(await cacheService.getDriverName(), 'Juan');
+      expect(await cacheService.isOnboardingComplete(), isTrue);
+
+      await cacheService.clearAll();
+
+      expect(await cacheService.getDriverName(), isNull);
+      expect(await cacheService.isOnboardingComplete(), isFalse);
+    });
   });
 
   group('HomeScreen Widget Tests', () {
-    setUp(() {
+    testWidgets('HomeScreen renders balance cards and honest recent routes empty state',
+        (tester) async {
       SharedPreferences.setMockInitialValues({
         'aero_balance_autosweep': 1800.0,
         'aero_balance_easytrip': 120.0, // Low balance (<200)
       });
-    });
+      final cacheService = CacheService();
 
-    testWidgets('HomeScreen renders balance cards and status tags accurately', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: HomeScreen(),
+        MaterialApp(
+          home: HomeScreen(cacheService: cacheService),
         ),
       );
 
       await tester.pumpAndSettle();
 
-      // Check balances render with formatted currency
+      // Verified Hero Mascot Card & Search
+      expect(find.text('AERO CO-PILOT READY'), findsOneWidget);
+      expect(find.text('Expressway Radar Active'), findsOneWidget);
+      expect(find.text('Search routes, tolls, interchanges...'), findsOneWidget);
+
+      // Verified Balance Cards (White amounts, status tags, Edit & Top Up buttons)
+      expect(find.text('AUTOSWEEP RFID'), findsOneWidget);
+      expect(find.text('EASYTRIP RFID'), findsOneWidget);
       expect(find.text('₱1800.00'), findsOneWidget);
       expect(find.text('₱120.00'), findsOneWidget);
-
-      // Check status indicators: 1800 -> Active, 120 -> Low Balance
       expect(find.text('Active'), findsOneWidget);
       expect(find.text('Low Balance'), findsOneWidget);
+      expect(find.text('EDIT'), findsNWidgets(2));
+      expect(find.text('TOP UP'), findsNWidgets(2));
+
+      // Verified Recent Routes Section Honest Empty State (No fake demo routes)
+      expect(find.text('Recent Routes'), findsOneWidget);
+      expect(find.text('No routes calculated yet'), findsOneWidget);
+      expect(find.text('Plan a Trip'), findsOneWidget);
     });
 
     testWidgets('Tapping EDIT opens dialog and updates balance', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'aero_balance_autosweep': 1250.0,
+        'aero_balance_easytrip': 840.50,
+      });
+      final cacheService = CacheService();
+
       await tester.pumpWidget(
-        const MaterialApp(
-          home: HomeScreen(),
+        MaterialApp(
+          home: HomeScreen(cacheService: cacheService),
         ),
       );
 
@@ -204,7 +241,42 @@ void main() {
       expect(find.text('₱3500.50'), findsOneWidget);
     });
 
-    testWidgets('TollCalculatorScreen displays low balance warning when fare exceeds wallet', (tester) async {
+    testWidgets('HomeScreen renders genuine calculated routes when available',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final cacheService = CacheService();
+
+      final trip = RecentTrip(
+        id: 'real_trip_1',
+        originId: 'slex_calamba',
+        originName: 'Calamba Exit',
+        destinationId: 'nlex_bocaue',
+        destinationName: 'Bocaue Barrier',
+        vehicleClass: 1,
+        totalFare: 689.0,
+        corridors: ['SLEX', 'SKYWAY', 'NLEX'],
+        timestamp: DateTime.now(),
+        isFavorite: false,
+      );
+      await cacheService.addRecentTrip(trip);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(cacheService: cacheService),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Displays genuine route calculation
+      expect(find.text('Calamba Exit → Bocaue Barrier'), findsOneWidget);
+      expect(find.text('₱689.00'), findsOneWidget);
+      expect(find.text('Class 1'), findsOneWidget);
+      expect(find.text('No routes calculated yet'), findsNothing);
+    });
+
+    testWidgets('TollCalculatorScreen displays low balance warning when fare exceeds wallet',
+        (tester) async {
       SharedPreferences.setMockInitialValues({
         'aero_balance_autosweep': 50.0, // Low Autosweep balance (<150 needed for Calamba)
         'aero_balance_easytrip': 1000.0,
@@ -222,7 +294,11 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Fare is 150.00, Autosweep balance is 50.00 -> Warning banner should appear
+      // Drag ListView down to reveal operator breakdown and warning
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pumpAndSettle();
+
+      // Fare is 185.00, Autosweep balance is 50.00 -> Warning banner should appear
       expect(find.text('LOW RFID BALANCE WARNING'), findsOneWidget);
       expect(find.textContaining('Autosweep balance'), findsOneWidget);
       expect(find.text('Wallet: ₱50 (Short)'), findsOneWidget);

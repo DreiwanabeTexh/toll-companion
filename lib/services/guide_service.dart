@@ -25,17 +25,21 @@ class GuideService {
   /// Fetches active guide entries ordered by sortOrder from Firestore.
   /// Automatically saves to local cache.
   Stream<List<GuideEntry>> getGuideEntries() {
-    return _firestoreService.guideEntriesRef
-        .where('isActive', isEqualTo: true)
-        .orderBy('sortOrder')
-        .snapshots()
-        .map((snapshot) {
-      final entries = snapshot.docs.map((doc) => doc.data()).toList();
-      if (entries.isNotEmpty) {
-        _cacheService.saveGuideEntries(entries);
-      }
-      return entries;
-    });
+    try {
+      return _firestoreService.guideEntriesRef
+          .where('isActive', isEqualTo: true)
+          .orderBy('sortOrder')
+          .snapshots()
+          .map((snapshot) {
+        final entries = snapshot.docs.map((doc) => doc.data()).toList();
+        if (entries.isNotEmpty) {
+          _cacheService.saveGuideEntries(entries);
+        }
+        return entries;
+      }).handleError((_) => defaultGuideEntries);
+    } catch (_) {
+      return Stream.value(defaultGuideEntries);
+    }
   }
 
   /// Retrieves locally cached guide entries if offline.

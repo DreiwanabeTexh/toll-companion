@@ -4,6 +4,7 @@ import '../models/emergency_contact.dart';
 import '../models/route_model.dart';
 import '../models/toll_plaza.dart';
 import '../models/toll_segment.dart';
+import '../models/toll_charge_rule.dart';
 import '../models/guide_entry.dart';
 import '../models/recent_trip.dart';
 
@@ -12,6 +13,7 @@ import '../models/recent_trip.dart';
 /// Provides instant offline resilience without external authentication or cloud sync:
 /// - Emergency contacts (so hotlines are available even in zero-signal deadzones)
 /// - Toll Plazas & segments for exit-to-exit routing
+/// - Toll Charge Rules for accurate offline TRB fare calculations
 /// - Routes & toll segments for cached fare lookups
 /// - Quick Guide troubleshooting content
 /// - Last calculated route and fare
@@ -19,6 +21,7 @@ import '../models/recent_trip.dart';
 class CacheService {
   static const String _keyEmergencyContacts = 'aero_cached_emergency_contacts';
   static const String _keyPlazas = 'aero_cached_plazas';
+  static const String _keyTollRules = 'aero_cached_toll_rules';
   static const String _keyRoutes = 'aero_cached_routes';
   static const String _keyRouteSegmentsPrefix = 'aero_cached_segments_';
   static const String _keyGuideEntries = 'aero_cached_guide_entries';
@@ -28,9 +31,12 @@ class CacheService {
   static const String _keyRecentTrips = 'aero_recent_trips';
   static const String _keyFuelPrice = 'aero_fuel_price';
   static const String _keyFuelEfficiency = 'aero_fuel_efficiency';
-  static const String _keyFuelType = 'aero_fuel_type';
   static const String _keyVehicleProfile = 'aero_vehicle_profile';
   static const String _keyFuelEstimatorEnabled = 'aero_fuel_estimator_enabled';
+  static const String _keyOnboardingComplete = 'onboarding_complete';
+  static const String _keyDriverName = 'driver_name';
+  static const String _keyUseSkyway = 'aero_use_skyway';
+  static const String _keyThemeMode = 'aero_theme_mode';
 
   final SharedPreferences? _customPrefs;
 
@@ -78,6 +84,28 @@ class CacheService {
       final List<dynamic> list = jsonDecode(jsonStr);
       return list
           .map((item) => TollPlaza.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // --- Toll Charge Rules ---
+
+  Future<void> saveTollRules(List<TollChargeRule> rules) async {
+    final prefs = await _getPrefs();
+    final jsonList = rules.map((r) => r.toJson()).toList();
+    await prefs.setString(_keyTollRules, jsonEncode(jsonList));
+  }
+
+  Future<List<TollChargeRule>?> getTollRules() async {
+    try {
+      final prefs = await _getPrefs();
+      final jsonStr = prefs.getString(_keyTollRules);
+      if (jsonStr == null || jsonStr.isEmpty) return null;
+      final List<dynamic> list = jsonDecode(jsonStr);
+      return list
+          .map((item) => TollChargeRule.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
     } catch (_) {
       return null;
@@ -208,14 +236,13 @@ class CacheService {
     try {
       final prefs = await _getPrefs();
       final jsonStr = prefs.getString(_keyRecentTrips);
-      if (jsonStr == null || jsonStr.isEmpty) return _getDefaultRecentTrips();
+      if (jsonStr == null || jsonStr.isEmpty) return [];
       final List<dynamic> list = jsonDecode(jsonStr);
-      if (list.isEmpty) return _getDefaultRecentTrips();
       return list
           .map((item) => RecentTrip.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
     } catch (_) {
-      return _getDefaultRecentTrips();
+      return [];
     }
   }
 
@@ -246,47 +273,6 @@ class CacheService {
     }
   }
 
-  List<RecentTrip> _getDefaultRecentTrips() {
-    return [
-      RecentTrip(
-        id: 'default_1',
-        originId: 'slex_alabang',
-        originName: 'Alabang (Filinvest)',
-        destinationId: 'slex_calamba',
-        destinationName: 'Calamba Exit',
-        vehicleClass: 1,
-        totalFare: 154.0,
-        corridors: ['SLEX'],
-        timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-        isFavorite: false,
-      ),
-      RecentTrip(
-        id: 'default_2',
-        originId: 'nlex_balintawak',
-        originName: 'Balintawak Barrier',
-        destinationId: 'nlex_bocaue',
-        destinationName: 'Bocaue Barrier',
-        vehicleClass: 1,
-        totalFare: 74.0,
-        corridors: ['NLEX'],
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        isFavorite: true,
-      ),
-      RecentTrip(
-        id: 'default_3',
-        originId: 'slex_magallanes',
-        originName: 'Magallanes',
-        destinationId: 'nlex_balintawak',
-        destinationName: 'Balintawak (Skyway 3)',
-        vehicleClass: 1,
-        totalFare: 264.0,
-        corridors: ['SKYWAY'],
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        isFavorite: false,
-      ),
-    ];
-  }
-
   // --- Fuel Preferences ---
 
   Future<void> saveFuelPreferences({
@@ -310,6 +296,57 @@ class CacheService {
       'vehicleProfile': prefs.getString(_keyVehicleProfile) ?? 'custom',
       'isEnabled': prefs.getBool(_keyFuelEstimatorEnabled) ?? true,
     };
+  }
+
+  // --- Skyway Preference ---
+
+  Future<void> saveUseSkyway(bool useSkyway) async {
+    final prefs = await _getPrefs();
+    await prefs.setBool(_keyUseSkyway, useSkyway);
+  }
+
+  Future<bool> getUseSkyway() async {
+    final prefs = await _getPrefs();
+    return prefs.getBool(_keyUseSkyway) ?? true;
+  }
+
+  // --- First-Run Onboarding & Driver Personalization ---
+
+  Future<bool> isOnboardingComplete() async {
+    final prefs = await _getPrefs();
+    return prefs.getBool(_keyOnboardingComplete) ?? false;
+  }
+
+  Future<void> setOnboardingComplete(bool complete) async {
+    final prefs = await _getPrefs();
+    await prefs.setBool(_keyOnboardingComplete, complete);
+  }
+
+  Future<String?> getDriverName() async {
+    final prefs = await _getPrefs();
+    return prefs.getString(_keyDriverName);
+  }
+
+  Future<void> setDriverName(String name) async {
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyDriverName, name.trim());
+  }
+
+  Future<String> getThemeMode() async {
+    final prefs = await _getPrefs();
+    return prefs.getString(_keyThemeMode) ?? 'dark';
+  }
+
+  Future<void> saveThemeMode(String mode) async {
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyThemeMode, mode);
+  }
+
+  /// Clears ALL stored local state (onboarding flag, driver name, cached reference data,
+  /// recent trips, fuel preferences, and custom balances) to reset app to fresh install state.
+  Future<void> clearAll() async {
+    final prefs = await _getPrefs();
+    await prefs.clear();
   }
 }
 
