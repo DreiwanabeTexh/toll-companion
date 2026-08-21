@@ -21,13 +21,13 @@
 ## 📱 See Aero in Action
 
 <div align="center">
-  <img src="assets/screenshots/home.png" alt="Home Dashboard" width="45%" />
+  <img src="assets/screenshots/home.jfif" alt="Home Dashboard" width="45%" />
   &nbsp;
-  <img src="assets/screenshots/toll-calculator.png" alt="Toll Calculator" width="45%" />
+  <img src="assets/screenshots/toll-calculator.jfif" alt="Toll Calculator" width="45%" />
   <br /><br />
-  <img src="assets/screenshots/quick-guide.png" alt="Quick Guide" width="45%" />
+  <img src="assets/screenshots/quick-guide.jfif" alt="Quick Guide" width="45%" />
   &nbsp;
-  <img src="assets/screenshots/emergency.png" alt="Emergency Assistance" width="45%" />
+  <img src="assets/screenshots/emergency.jfif" alt="Emergency Assistance" width="45%" />
 </div>
 
 <br />
@@ -36,17 +36,17 @@
 <summary><b>📷 More Features (Vehicle Classes, Fuel Estimator, Checklist, & Settings)</b></summary>
 <br />
 <div align="center">
-  <img src="assets/screenshots/vehicle-class.png" alt="Vehicle Class Selector" width="45%" />
+  <img src="assets/screenshots/vehicle-class.jfif" alt="Vehicle Class Selector" width="45%" />
   &nbsp;
-  <img src="assets/screenshots/recent-routes.png" alt="Recent Routes" width="45%" />
+  <img src="assets/screenshots/recent-routes.jfif" alt="Recent Routes" width="45%" />
   <br /><br />
-  <img src="assets/screenshots/fuel-estimator.png" alt="Fuel Budget Estimator" width="45%" />
+  <img src="assets/screenshots/fuel-estimator.jfif" alt="Fuel Budget Estimator" width="45%" />
   &nbsp;
-  <img src="assets/screenshots/light-mode.png" alt="Light Mode Theme" width="45%" />
+  <img src="assets/screenshots/light-mode.jfif" alt="Light Mode Theme" width="45%" />
   <br /><br />
-  <img src="assets/screenshots/settings.png" alt="Settings & Profile" width="45%" />
+  <img src="assets/screenshots/settings.jfif" alt="Settings & Profile" width="45%" />
   &nbsp;
-  <img src="assets/screenshots/checklist.png" alt="Pre-Trip Safety Checklist" width="45%" />
+  <img src="assets/screenshots/checklist.jfif" alt="Pre-Trip Safety Checklist" width="45%" />
 </div>
 </details>
 
@@ -164,7 +164,7 @@ TollChargeRule(
 Toll/
 ├── assets/
 │   ├── images/              # Logos, mascots, and app branding assets
-│   └── screenshots/         # Real application screenshots in PNG format
+│   └── screenshots/         # Real application screenshots in JFIF format
 ├── lib/
 │   ├── data/                # Toll rate matrices & expressway network definitions
 │   ├── models/              # Data models (TollPlaza, Route, RecentTrip, etc.)
