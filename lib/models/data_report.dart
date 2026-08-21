@@ -26,15 +26,22 @@ class DataReport {
   });
 
   Map<String, dynamic> toFirestore() {
+    final sanitizedContext = <String, String>{};
+    final allowedKeys = {'displayNumber', 'coverageArea', 'origin', 'destination', 'vehicleClass', 'totalFare'};
+    contextData.forEach((key, value) {
+      if (allowedKeys.contains(key) && value != null) {
+        sanitizedContext[key] = value.toString();
+      }
+    });
+
     return {
       'reportType': reportType,
       'targetId': targetId,
       'targetName': targetName,
       'issueDescription': issueDescription,
       'appVersion': appVersion,
-      'contextData': contextData,
-      'timestamp': Timestamp.fromDate(timestamp),
-      'status': 'pending', // for admin review in Firebase console
+      if (sanitizedContext.isNotEmpty) 'contextData': sanitizedContext,
+      'timestamp': FieldValue.serverTimestamp(),
     };
   }
 

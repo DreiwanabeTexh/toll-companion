@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -6,6 +9,9 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
 
 android {
     namespace = "com.example.tollcompanion.toll_companion"
@@ -17,11 +23,36 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+                val keyAliasVal = keystoreProperties.getProperty("keyAlias")
+                val keyPasswordVal = keystoreProperties.getProperty("keyPassword")
+                val storeFileVal = keystoreProperties.getProperty("storeFile")
+                val storePasswordVal = keystoreProperties.getProperty("storePassword")
+
+                if (keyAliasVal.isNullOrBlank() || keyPasswordVal.isNullOrBlank() || storeFileVal.isNullOrBlank() || storePasswordVal.isNullOrBlank()) {
+                    throw GradleException("key.properties is missing required signing properties (keyAlias, keyPassword, storeFile, storePassword). Release build aborted.")
+                }
+
+                val storeFileObj = file(storeFileVal)
+                if (!storeFileObj.exists()) {
+                    throw GradleException("Release keystore file specified in key.properties does not exist: ${storeFileObj.absolutePath}. Release build aborted.")
+                }
+
+                keyAlias = keyAliasVal
+                keyPassword = keyPasswordVal
+                storeFile = storeFileObj
+                storePassword = storePasswordVal
+            } else {
+                throw GradleException("android/key.properties file not found. Release builds require a configured private release keystore. Fallback signing with debug keys is prohibited for security compliance.")
+            }
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.tollcompanion.toll_companion"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -30,9 +61,7 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

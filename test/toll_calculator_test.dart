@@ -208,6 +208,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
 
+      // Initially no fare is calculated until user taps Calculate Fare button
+      expect(find.text('CALCULATE FARE'), findsOneWidget);
+      expect(find.text('TOTAL ESTIMATED TRIP COST'), findsNothing);
+
+      // Tap Calculate Fare button
+      await tester.tap(find.text('CALCULATE FARE'));
+      await tester.pumpAndSettle();
+
       // Verify Total Estimated Trip Cost Hero Card
       expect(find.text('TOTAL ESTIMATED TRIP COST'), findsOneWidget);
       expect(find.text('(Toll + Fuel)'), findsOneWidget);
@@ -227,6 +235,7 @@ void main() {
       expect(find.text('MANUAL INPUTS (EDIT ANYTIME)'), findsOneWidget);
       expect(find.text('KM / LITER'), findsOneWidget);
       expect(find.text('GAS PRICE'), findsOneWidget);
+      expect(find.text('Your trip and fuel settings are saved on this device.'), findsOneWidget);
       expect(find.text('Sedan'), findsOneWidget);
       expect(find.text('SUV'), findsOneWidget);
       expect(find.text('Van/Pickup'), findsOneWidget);
@@ -260,6 +269,10 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      // Tap Calculate Fare button
+      await tester.tap(find.text('CALCULATE FARE'));
+      await tester.pumpAndSettle();
+
       // Verify Skyway toggle is visible and set to Elevated route
       expect(find.text('Via Skyway (Elevated)'), findsOneWidget);
       expect(find.text('VIA SKYWAY'), findsOneWidget);
@@ -268,9 +281,34 @@ void main() {
       await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
 
-      // Verify toggle switched to SLEX At-Grade route
+      // Outdated banner appears indicating inputs changed
+      expect(find.text('Route details changed. Tap Calculate Fare to update.'), findsOneWidget);
+
+      // Tap Calculate Fare to re-calculate At-Grade route
+      await tester.tap(find.text('CALCULATE FARE'));
+      await tester.pumpAndSettle();
+
+      // Verify toggle switched to SLEX At-Grade route and outdated banner disappears
       expect(find.text('SLEX At-Grade (Surface)'), findsOneWidget);
       expect(find.text('AT-GRADE'), findsOneWidget);
+      expect(find.text('Route details changed. Tap Calculate Fare to update.'), findsNothing);
+    });
+
+    testWidgets('Calculate Fare button disabled when missing exits and enabled when selected',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: TollCalculatorScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find Calculate button
+      final btnFinder = find.widgetWithText(ElevatedButton, 'CALCULATE FARE');
+      expect(btnFinder, findsOneWidget);
+
+      final btnWidget = tester.widget<ElevatedButton>(btnFinder);
+      expect(btnWidget.onPressed, isNull); // Disabled!
     });
   });
 

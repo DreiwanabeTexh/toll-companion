@@ -138,12 +138,53 @@ void main() {
       expect(find.text('3 of 3 Ready'), findsOneWidget);
       expect(find.text('Ready to Drive'), findsOneWidget);
 
-      // Tap Reset button
+      // Tap Reset button in app bar
       await tester.tap(find.text('Reset'));
+      await tester.pumpAndSettle();
+
+      // Dialog is displayed
+      expect(find.text('Reset Checklist?'), findsOneWidget);
+      expect(find.text('Are you sure you want to uncheck all items? Your saved progress will be cleared.'), findsOneWidget);
+
+      // Confirm Reset inside the dialog
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Reset'));
       await tester.pumpAndSettle();
 
       expect(find.text('0 of 3 Ready'), findsOneWidget);
       expect(find.text('In Progress'), findsOneWidget);
+    });
+
+    testWidgets('Checklist items persist when re-opening screen',
+        (WidgetTester tester) async {
+      final mockService = MockChecklistService(
+        itemsStreamProvider: () => Stream.value(sampleItems),
+      );
+
+      // 1. First open and check 2 items
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChecklistScreen(checklistService: mockService),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Autosweep RFID Balance'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tire Pressure & Spare Tire'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 3 Ready'), findsOneWidget);
+
+      // 2. Re-create screen instance
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChecklistScreen(checklistService: mockService),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Progress is preserved
+      expect(find.text('2 of 3 Ready'), findsOneWidget);
     });
 
     testWidgets('Displays route context banner when route is passed',

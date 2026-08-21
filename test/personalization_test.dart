@@ -277,6 +277,10 @@ void main() {
 
     testWidgets('TollCalculatorScreen displays low balance warning when fare exceeds wallet',
         (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
       SharedPreferences.setMockInitialValues({
         'aero_balance_autosweep': 50.0, // Low Autosweep balance (<150 needed for Calamba)
         'aero_balance_easytrip': 1000.0,
@@ -292,6 +296,10 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+
+      // Tap Calculate Fare button
+      await tester.tap(find.text('CALCULATE FARE'));
       await tester.pumpAndSettle();
 
       // Drag ListView down to reveal operator breakdown and warning

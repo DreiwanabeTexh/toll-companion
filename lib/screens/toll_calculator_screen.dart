@@ -57,6 +57,7 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
 
   RouteResult? _routeResult;
   bool _isCalculating = false;
+  bool _isOutdated = false;
   String? _routingError;
   double? _userAutosweepBalance;
   double? _userEasytripBalance;
@@ -140,6 +141,41 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     );
   }
 
+  void _saveCurrentRouteInputs() {
+    _cacheService.saveRouteInputs(
+      originId: _originPlaza?.id,
+      destinationId: _destinationPlaza?.id,
+      vehicleClass: _selectedVehicleClass,
+      useSkyway: _useSkyway,
+    );
+  }
+
+  Future<void> _loadSavedRouteInputs() async {
+    final inputs = await _cacheService.getRouteInputs();
+    final savedOriginId = inputs['originId'] as String?;
+    final savedDestId = inputs['destinationId'] as String?;
+    final savedClass = inputs['vehicleClass'] as int? ?? 1;
+    final savedSkyway = inputs['useSkyway'] as bool? ?? true;
+
+    final plazas = _initialPlazas ?? TollService.defaultPlazas;
+    if (mounted) {
+      setState(() {
+        _selectedVehicleClass = savedClass;
+        _useSkyway = savedSkyway;
+        if (savedOriginId != null && _originPlaza == null) {
+          try {
+            _originPlaza = plazas.firstWhere((p) => p.id == savedOriginId);
+          } catch (_) {}
+        }
+        if (savedDestId != null && _destinationPlaza == null) {
+          try {
+            _destinationPlaza = plazas.firstWhere((p) => p.id == savedDestId);
+          } catch (_) {}
+        }
+      });
+    }
+  }
+
   Future<void> _loadUserBalances() async {
     final balances = await _cacheService.getRfidBalances();
     if (mounted) {
@@ -162,17 +198,20 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
       );
       _originPlaza = origin;
       _destinationPlaza = dest;
-      _calculateFare();
     } else {
-      _originPlaza = null;
-      _destinationPlaza = null;
-      _routeResult = null;
+      _loadSavedRouteInputs();
     }
   }
 
   Future<void> _calculateFare() async {
     if (_originPlaza == null || _destinationPlaza == null) return;
+    setState(() {
+      _isCalculating = true;
+    });
     _loadUserBalances();
+
+    // Brief async yield for smooth button loading state transition
+    await Future<void>.delayed(const Duration(milliseconds: 100));
 
     try {
       final result = _tollService.calculateExitToExitFareSync(
@@ -182,15 +221,18 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         useSkyway: _useSkyway,
       );
 
-      setState(() {
-        _routeResult = result;
-        _isCalculating = false;
-        if (result.segments.isEmpty && _originPlaza!.id != _destinationPlaza!.id) {
-          _routingError = 'No continuous expressway path found between these exits.';
-        } else {
-          _routingError = null;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _routeResult = result;
+          _isCalculating = false;
+          _isOutdated = false;
+          if (result.segments.isEmpty && _originPlaza!.id != _destinationPlaza!.id) {
+            _routingError = 'No continuous expressway path found between these exits.';
+          } else {
+            _routingError = null;
+          }
+        });
+      }
 
       if (result.segments.isNotEmpty) {
         final corridors = result.segments.map((s) => s.expressway).toSet().toList();
@@ -210,10 +252,12 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         await _cacheService.addRecentTrip(trip);
       }
     } catch (e) {
-      setState(() {
-        _isCalculating = false;
-        _routingError = 'Routing calculation failed: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isCalculating = false;
+          _routingError = 'Routing calculation failed: $e';
+        });
+      }
     }
   }
 
@@ -223,8 +267,11 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
       final temp = _originPlaza;
       _originPlaza = _destinationPlaza;
       _destinationPlaza = temp;
+      if (_routeResult != null) {
+        _isOutdated = true;
+      }
     });
-    _calculateFare();
+    _saveCurrentRouteInputs();
   }
 
   Future<void> _pickOrigin(List<TollPlaza> plazas) async {
@@ -238,8 +285,11 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     if (selected != null && mounted) {
       setState(() {
         _originPlaza = selected;
+        if (_routeResult != null) {
+          _isOutdated = true;
+        }
       });
-      _calculateFare();
+      _saveCurrentRouteInputs();
     }
   }
 
@@ -254,8 +304,11 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
     if (selected != null && mounted) {
       setState(() {
         _destinationPlaza = selected;
+        if (_routeResult != null) {
+          _isOutdated = true;
+        }
       });
-      _calculateFare();
+      _saveCurrentRouteInputs();
     }
   }
 
@@ -336,11 +389,46 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // Calculated Fare Breakdown View with smooth entrance
+              // Outdated Route Warning Notice
+              if (_isOutdated && _routeResult != null && _routeResult!.segments.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AeroColors.warningAmber.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AeroColors.warningAmber.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: AeroColors.warningAmber, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Route details changed. Tap Calculate Fare to update.',
+                          style: TextStyle(
+                            color: AeroColors.warningAmber,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Calculated Fare Breakdown View with smooth entrance & dimming when outdated
               if (_routeResult != null && _routeResult!.segments.isNotEmpty) ...[
-                AeroFadeSlideIn(
-                  key: ValueKey<String>('${_originPlaza?.id}_${_destinationPlaza?.id}_$_selectedVehicleClass'),
-                  child: _buildFareBreakdownView(_routeResult!),
+                Opacity(
+                  opacity: _isOutdated ? 0.38 : 1.0,
+                  child: AeroFadeSlideIn(
+                    key: ValueKey<String>('${_originPlaza?.id}_${_destinationPlaza?.id}_$_selectedVehicleClass'),
+                    child: _buildFareBreakdownView(_routeResult!),
+                  ),
                 ),
               ] else if (_originPlaza?.id == _destinationPlaza?.id && _originPlaza != null) ...[
                 _buildSameExitNotice(),
@@ -632,9 +720,12 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
             onChanged: (val) {
               setState(() {
                 _useSkyway = val;
+                if (_routeResult != null) {
+                  _isOutdated = true;
+                }
               });
               _saveSkywayPreference(val);
-              _calculateFare();
+              _saveCurrentRouteInputs();
             },
           ),
         ],
@@ -658,18 +749,18 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         const SizedBox(height: 8),
         Row(
           children: [
-            _buildClassChip(1, 'Class 1', 'Cars, SUVs, 4x4, Vans'),
+            _buildClassChip(1, 'Class 1', 'Cars / SUVs', Icons.directions_car),
             const SizedBox(width: 8),
-            _buildClassChip(2, 'Class 2', 'Buses, Light Trucks'),
+            _buildClassChip(2, 'Class 2', 'Buses / Trucks', Icons.directions_bus),
             const SizedBox(width: 8),
-            _buildClassChip(3, 'Class 3', 'Heavy Multi-Axle Trucks'),
+            _buildClassChip(3, 'Class 3', 'Heavy Trucks', Icons.local_shipping),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildClassChip(int classNum, String title, String subtitle) {
+  Widget _buildClassChip(int classNum, String title, String subtitle, IconData icon) {
     final isSelected = _selectedVehicleClass == classNum;
 
     return Expanded(
@@ -678,13 +769,16 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
         onTap: () {
           setState(() {
             _selectedVehicleClass = classNum;
+            if (_routeResult != null) {
+              _isOutdated = true;
+            }
           });
-          _calculateFare();
+          _saveCurrentRouteInputs();
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
           decoration: BoxDecoration(
             color: isSelected
                 ? AeroColors.neonBlue.withValues(alpha: 0.15)
@@ -696,18 +790,25 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
             ),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? AeroColors.neonBlue : AeroColors.textSecondary,
+              ),
+              const SizedBox(height: 4),
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w800,
                   color: isSelected ? AeroColors.neonBlue : AeroColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                classNum == 1 ? 'Cars / SUVs' : classNum == 2 ? 'Buses / Trucks' : 'Heavy Trucks',
+                subtitle,
                 style: TextStyle(
                   fontSize: 9.5,
                   color: isSelected ? AeroColors.primaryTint : AeroColors.textSecondary,
@@ -723,13 +824,16 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
   }
 
   Widget _buildCalculateButton() {
+    final canCalculate = _originPlaza != null && _destinationPlaza != null && !_isCalculating;
+
     return AeroBouncyTap(
-      scaleDown: 0.97,
+      scaleDown: canCalculate ? 0.97 : 1.0,
+      onTap: canCalculate ? _calculateFare : null,
       child: SizedBox(
         width: double.infinity,
         height: 52,
         child: ElevatedButton.icon(
-          onPressed: _isCalculating ? null : _calculateFare,
+          onPressed: canCalculate ? _calculateFare : null,
           icon: _isCalculating
               ? const SizedBox(
                   width: 18,
@@ -739,23 +843,35 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                     color: Colors.white,
                   ),
                 )
-              : const Icon(Icons.calculate, size: 20, color: Colors.white),
+              : Icon(
+                  Icons.calculate,
+                  size: 20,
+                  color: canCalculate ? Colors.white : AeroColors.textMuted,
+                ),
           label: Text(
-            _isCalculating ? 'ROUTING PATH...' : 'CALCULATE FARE',
-            style: const TextStyle(
+            _isCalculating ? 'CALCULATING FARE...' : 'CALCULATE FARE',
+            style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.2,
+              color: canCalculate ? Colors.white : AeroColors.textMuted,
             ),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: AeroColors.neonBlue,
             foregroundColor: Colors.white,
+            disabledBackgroundColor: AeroColors.surfaceContainerHighest,
+            disabledForegroundColor: AeroColors.textMuted,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: canCalculate ? AeroColors.neonBlue : AeroColors.border,
+              ),
             ),
-            elevation: 6,
-            shadowColor: AeroColors.neonBlue.withValues(alpha: 0.5),
+            elevation: canCalculate ? 6 : 0,
+            shadowColor: canCalculate
+                ? AeroColors.neonBlue.withValues(alpha: 0.5)
+                : Colors.transparent,
           ),
         ),
       ),
@@ -1528,6 +1644,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                       width: 1.5),
                                 ),
                               ),
+                              onEditingComplete: () {
+                                _saveFuelPreferences();
+                                FocusScope.of(context).unfocus();
+                              },
+                              onSubmitted: (_) {
+                                _saveFuelPreferences();
+                                FocusScope.of(context).unfocus();
+                              },
                               onChanged: (val) {
                                 final parsed = double.tryParse(val);
                                 if (parsed != null && parsed > 0) {
@@ -1584,7 +1708,6 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 12),
-                                filled: true,
                                 fillColor: AeroColors.surfaceContainerLow,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
@@ -1603,6 +1726,14 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                                       width: 1.5),
                                 ),
                               ),
+                              onEditingComplete: () {
+                                _saveFuelPreferences();
+                                FocusScope.of(context).unfocus();
+                              },
+                              onSubmitted: (_) {
+                                _saveFuelPreferences();
+                                FocusScope.of(context).unfocus();
+                              },
                               onChanged: (val) {
                                 final parsed = double.tryParse(val);
                                 if (parsed != null && parsed > 0) {
@@ -1619,20 +1750,21 @@ class _TollCalculatorScreenState extends State<TollCalculatorScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
-                  // Friendly Helper Note
+                  // Friendly Helper Note & Saved Locally Indicator
                   Row(
                     children: [
-                      Icon(Icons.info_outline,
+                      Icon(Icons.save_outlined,
                           size: 13, color: AeroColors.textSecondary),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Type your car\'s dashboard km/L and current gas pump price.',
+                          'Your trip and fuel settings are saved on this device.',
                           style: TextStyle(
                             fontSize: 10.5,
-                            color: AeroColors.textSecondary.withValues(alpha: 0.85),
+                            color: AeroColors.textSecondary.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),

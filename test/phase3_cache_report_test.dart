@@ -162,7 +162,8 @@ void main() {
       expect(map['reportType'], 'toll_fare');
       expect(map['targetName'], 'Metro Corridor');
       expect(map['issueDescription'], 'Fare changed to 150');
-      expect(map['status'], 'pending');
+      expect(map.containsKey('status'), isFalse);
+      expect(map.containsKey('timestamp'), isTrue);
     });
 
     testWidgets('ReportDialog opens, accepts input, and submits report',

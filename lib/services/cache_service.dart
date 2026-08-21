@@ -37,6 +37,10 @@ class CacheService {
   static const String _keyDriverName = 'driver_name';
   static const String _keyUseSkyway = 'aero_use_skyway';
   static const String _keyThemeMode = 'aero_theme_mode';
+  static const String _keyChecklistProgress = 'aero_checklist_progress';
+  static const String _keySavedOriginId = 'aero_saved_origin_id';
+  static const String _keySavedDestinationId = 'aero_saved_destination_id';
+  static const String _keySavedVehicleClass = 'aero_saved_vehicle_class';
 
   final SharedPreferences? _customPrefs;
 
@@ -340,6 +344,70 @@ class CacheService {
   Future<void> saveThemeMode(String mode) async {
     final prefs = await _getPrefs();
     await prefs.setString(_keyThemeMode, mode);
+  }
+
+  // --- Checklist Progress ---
+
+  Future<void> saveChecklistProgress(Set<String> checkedIds) async {
+    final prefs = await _getPrefs();
+    await prefs.setStringList(_keyChecklistProgress, checkedIds.toList());
+  }
+
+  Future<Set<String>> getChecklistProgress() async {
+    try {
+      final prefs = await _getPrefs();
+      final list = prefs.getStringList(_keyChecklistProgress);
+      if (list == null) return {};
+      return list.toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // --- Route Inputs (Saved Selections) ---
+
+  Future<void> saveRouteInputs({
+    String? originId,
+    String? destinationId,
+    int? vehicleClass,
+    bool? useSkyway,
+  }) async {
+    final prefs = await _getPrefs();
+    if (originId != null) {
+      await prefs.setString(_keySavedOriginId, originId);
+    } else {
+      await prefs.remove(_keySavedOriginId);
+    }
+    if (destinationId != null) {
+      await prefs.setString(_keySavedDestinationId, destinationId);
+    } else {
+      await prefs.remove(_keySavedDestinationId);
+    }
+    if (vehicleClass != null) {
+      await prefs.setInt(_keySavedVehicleClass, vehicleClass);
+    }
+    if (useSkyway != null) {
+      await prefs.setBool(_keyUseSkyway, useSkyway);
+    }
+  }
+
+  Future<Map<String, dynamic>> getRouteInputs() async {
+    try {
+      final prefs = await _getPrefs();
+      return {
+        'originId': prefs.getString(_keySavedOriginId),
+        'destinationId': prefs.getString(_keySavedDestinationId),
+        'vehicleClass': prefs.getInt(_keySavedVehicleClass) ?? 1,
+        'useSkyway': prefs.getBool(_keyUseSkyway) ?? true,
+      };
+    } catch (_) {
+      return {
+        'originId': null,
+        'destinationId': null,
+        'vehicleClass': 1,
+        'useSkyway': true,
+      };
+    }
   }
 
   /// Clears ALL stored local state (onboarding flag, driver name, cached reference data,

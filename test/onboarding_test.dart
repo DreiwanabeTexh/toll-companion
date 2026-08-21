@@ -379,13 +379,17 @@ void main() {
       // Vehicle class selection is preserved (Class 3 is still active)
       expect(find.text('Trip Details'), findsWidgets);
 
-      // Now calculate a route using switchTabWithRoute
+      // Now populate a route using switchTabWithRoute and calculate fare
       MainNavigationScaffold.switchTabWithRoute(
         tester.element(find.byType(TollCalculatorScreen)),
         originId: 'slex_calamba',
         destinationId: 'nlex_bocaue',
         vehicleClass: 1,
       );
+      await tester.pumpAndSettle();
+
+      // Tap Calculate Fare button
+      await tester.tap(find.text('CALCULATE FARE'));
       await tester.pumpAndSettle();
 
       expect(find.text('TOTAL ESTIMATED TRIP COST'), findsOneWidget);

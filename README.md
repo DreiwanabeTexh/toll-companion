@@ -1,220 +1,166 @@
-# Aero — Philippine Expressway Companion
+# Aero
+> **A Philippine Expressway Driving Companion**
 
-A driver's companion app for navigating Philippine expressways — built around the real pain point of multi-operator toll systems (Autosweep vs. Easytrip), for any driver planning a trip across PH expressways. Branded as **Aero**, with a bird mascot and dark "Nocturnal Command" visual identity.
-
-> **Status:** Phases 0–3 complete and functionally shipped (self/informal testing). Phase 3.5 (real data verification) in progress — Tier 1 emergency contacts verified; toll fare matrix verification still pending. Phase 4 (routing engine + personalization core) in active development.
-> **Note:** Toll plaza/fare data is still largely **placeholder** pending full verification against official sources (TRB, Autosweep, Easytrip). Emergency contact hotlines for the 5 Tier 1 agencies have been verified against official sources. Do not treat any unverified data as production-accurate — check each entry's "last verified" status in-app.
+Aero helps drivers estimate Philippine expressway tolls, view Autosweep and Easytrip totals, plan trips, save recent routes, and estimate fuel cost. Built specifically to eliminate the confusion of multi-operator RFID tolling systems in Luzon and beyond.
 
 ---
 
-## The Problem
+## 📱 Screenshots
 
-First-time and infrequent expressway drivers in the Philippines often don't know:
-- How much a trip will actually cost in tolls
-- That different expressways are operated by different RFID systems (Autosweep vs. Easytrip), each requiring separate balance
-- Whether their RFID balance is enough to get there and back
-- Who to call if something goes wrong mid-trip, and where the nearest help actually is
+| Home Dashboard | Toll Calculator (Dark) | Recent Routes |
+|:---:|:---:|:---:|
+| ![Home Dashboard](assets/screenshots/home.png) | ![Toll Calculator](assets/screenshots/toll-calculator.png) | ![Recent Routes](assets/screenshots/recent-routes.png) |
 
-Existing tools (Autosweep app, Easytrip app, Waze/Google Maps toll estimates) solve pieces of this, but nothing unifies a multi-operator trip into one clear picture — and none of them function as a broader trip companion.
-
-## The Solution
-
-A companion app that consolidates:
-- **Toll cost calculation**, broken down by RFID operator (never merged into a single misleading total)
-- **Emergency contacts**, sourced only from official/verified channels
-- **Quick guidance** for common on-the-road situations
-- Later: **route-specific briefings** and **pre-trip checklists**, built from real trip usage rather than guesswork
+| Light Mode | Dark Mode | Driver & Theme Settings |
+|:---:|:---:|:---:|
+| ![Light Mode](assets/screenshots/light-mode.png) | ![Dark Mode](assets/screenshots/dark-mode.png) | ![Settings](assets/screenshots/settings.png) |
 
 ---
 
-## Tech Stack
+## ✨ Features
 
-| Layer | Choice | Why |
-|---|---|---|
-| Frontend | **Flutter (Dart)** | Single codebase for Android + iOS, native performance, strong widget support for card/list-based UI |
-| Backend / Data | **Firebase (Firestore)** | Content-editable without app redeploys; pairs natively with Flutter via FlutterFire |
-| Tap-to-call | `url_launcher` package | Native `tel:` link handling |
-| Local caching | **`shared_preferences`** (implemented, Phase 3) | Offline support for spotty expressway signal — caches contacts, last route, guide entries; falls back automatically when Firestore reads fail |
-| Feedback/reporting | Write-only `dataReports` Firestore collection | Users can flag outdated data; no client read/update/delete access — reviewed manually via Firebase Console |
-| Auth | None yet — **tentative Phase 5** | No user accounts currently; all Firestore reads, no per-user writes. Login/sign-in is being considered as an optional future phase, not yet committed |
-
----
-
-## Target Audience
-
-- **Primary:** First-time or infrequent provincial/expressway drivers (holiday travelers, students, relocating families)
-- **Secondary:** Logistics/delivery drivers and small fleet operators needing quick trip cost estimates
+- **TRB-Matrix-Based Toll Estimates**: Accurate toll calculations for STAR, SLEX, Skyway Stages 1–3, NLEX, SCTEX, CALAX, CAVITEX, MCX, NAIAX, TPLEX, and CCLEX.
+- **Class 1, 2, and 3 Vehicle Selection**: Dedicated vehicle classification selector with intuitive icons (🚗 Class 1 Cars/SUVs, 🚌 Class 2 Buses, 🚛 Class 3 Heavy Trucks).
+- **Autosweep & Easytrip Breakdown**: Clear multi-operator split showing exactly how much balance is needed for SMC Tollways (Autosweep) vs. MPTC/Metro Pacific Tollways (Easytrip).
+- **Skyway vs. At-Grade Routing**: Interactive toggle to switch between elevated Skyway and surface SLEX routes where supported.
+- **Fuel-Cost Estimator**: Estimate total trip expenses with customizable pump prices, km/L fuel efficiency, and one-tap vehicle presets (Sedan, SUV, Van/Pickup).
+- **Recent Routes & Favorites**: Automatically logs computed trips with one-tap favorite toggling and instant route re-calculation.
+- **Saved Trip & Fuel Settings**: Remembers your preferred vehicle class, fuel efficiency, gas price, and recent route selections locally on your device.
+- **Light, Dark, and System Themes**: Seamless theme switching with high-contrast Light Mode and sleek Nocturnal Dark Mode.
+- **Pre-Trip Checklist**: Categorized vehicle roadworthiness, document, and RFID readiness checklist with persistent autosave across app restarts.
+- **Emergency Hotlines**: Direct tap-to-call verified emergency numbers for TRB, SMC Tollways, MPTC, MMDA, and PNP Highway Patrol Group.
+- **Offline Toll-Rate Fallback**: Fully functional offline without an internet connection using local cached rate matrices.
+- **Manually Editable Toll-Rate Data**: Cleanly structured single-source toll data for easy maintenance when toll regulatory updates occur.
 
 ---
 
-## Competitive Landscape (Summary)
+## ⚠️ Toll Estimate Disclaimer
 
-| Competitor | Strength | Gap This App Fills |
-|---|---|---|
-| Autosweep app | Official, accurate for SMC roads | Doesn't cover NLEX/Cavitex/CALAX |
-| Easytrip app | Official, accurate for MPTC roads | Doesn't cover SLEX/STAR |
-| Waze / Google Maps | Already installed, shows routes | Toll estimates often rough for PH; no multi-operator breakdown |
-| Generic toll calculators | Cross-operator, multi-country | Not PH-specialized; lacks local nuance and route-specific guidance |
-
-**Positioning:** Not "another calculator" — the one app that correctly stitches together multi-operator PH expressway trips and tells drivers exactly what to top up, before they're stuck at a gantry.
+> **Important:** Aero provides toll estimates based on manually maintained Toll Regulatory Board (TRB) rate matrices. Actual toll fees may vary due to newly gazetted rate adjustments, barrier configurations, or operator promos. Always check official TRB advisories and toll-plaza signage before travelling.
 
 ---
 
-## Features
+## 🛠️ Updating Toll Rates
 
-### Phase 1 — MVP ✅ Complete
+All toll fare data in Aero is stored and maintained in a single structured file:
+👉 [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart)
 
-| Feature | Description |
-|---|---|
-| **Toll Calculator** | Route builder + fare breakdown by RFID operator. Shows which wallet (Autosweep / Easytrip) needs topping up and by how much — never a single merged total. |
-| **Quick Guide** ("What do I do if...") | Expandable category accordion, content pulled from Firestore, "Troubleshoot" / "View FAQ" actions per topic. |
-| **Emergency Contacts (Tier 1 only)** | Official hotlines only — TRB, SMC/Autosweep, MPTC/Easytrip, MMDA, PNP-HPG. Tap-to-call UX. Every entry carries a mandatory **last-verified date** shown in the UI. Crowdsourced/local listings explicitly excluded from this phase. |
+### Code Structure Example
 
-### Phase 2 — Companion Depth ✅ Complete
-
-| Feature | Description |
-|---|---|
-| **Pre-Trip Checklist** | Categorized readiness checklist (RFID & Toll Wallets, Vehicle Roadworthiness, Documents, Emergency Equipment) with progress tracking, tied to the active route. |
-| **Route Briefing** | Tabbed Lane Tips / Rest Stops / Exit Warnings, tied to whatever route the user builds. Expanded incrementally based on real usage. |
-
-### Phase 2.5 — Aero Rebrand & Visual Identity ✅ Complete
-
-- Full UI/UX rebuild and rebrand to **Aero**, adopting the bird mascot and "Nocturnal Command" dark visual design system from the reference design folder
-- Persistent bottom tab navigation (Home / Tolls / Emergency / Guide)
-- Native Flutter-based mascot animation (wing-flap, breathing, banking tilt) — built with `AnimationController`, not a WebView, to keep the app fully functional offline
-- Dedicated large mascot "hero" placement on Home, Emergency, Quick Guide, and Toll Calculator
-
-### Phase 3 — Polish & Trust ✅ Complete
-
-- Visible "last verified" indicators across all contact and fare data
-- Offline caching (`shared_preferences`) for last-used route, emergency contacts, and guide entries — with a visible "Offline — showing saved data" banner when serving cached content
-- Write-only feedback/reporting mechanism to flag outdated numbers or fares
-
-### Phase 3.5 — Real Data Verification 🔄 In Progress
-
-- ✅ Tier 1 emergency contact hotlines verified against official sources (TRB, SMC/Autosweep, MPTC/Easytrip, MMDA, PNP-HPG)
-- ⬜ Toll fare matrix verification against official TRB/Autosweep/Easytrip sources — pending, larger scope (per-segment, per-operator, per-vehicle-class)
-
-### Phase 4 — Routing Engine & Personalization Core 🔄 In Progress
-
-| Feature | Description |
-|---|---|
-| **Free exit-to-exit routing engine** | Replaces the predefined-routes-only calculator with a searchable plaza/exit picker (origin + destination) and automatic multi-segment, multi-operator path calculation — matching how established PH toll calculator apps work, while keeping Aero's strict per-operator fare breakdown. |
-| **Manual RFID balance tracking** | User manually enters their known Autosweep/EasyTrip balance (no official balance-check API exists for third-party apps); app warns if a planned trip's fare would exceed the recorded balance. Includes a visible "balance last updated" trust indicator, same pattern as verified contacts/fares. |
-| **Recent Routes — real history** | Auto-logs every calculated trip locally (no manual save required) plus a separate manual "save as favorite" option for routes used often. |
-| **Randomized status copy** | Small pool of variant phrases for each screen's status pill (e.g. "Plan your trip.") that rotate rather than showing the same static line every time. |
-
-### Phase 5 — Accounts & Sync (Tentative / Not Yet Committed)
-
-- Login / sign-up
-- Personalized greeting (first name replacing "Hello, Driver")
-- Cross-device sync of saved routes, balance, and checklist state
-- *This phase is exploratory — "if ever" per current direction, not a committed roadmap item.*
-
-### Phase 6 — v2 Exploration
-
-- **Fuel comparison** across the route (explicitly deferred from v1 — strong v2 story, not a launch blocker)
-- Smart checklist auto-suggesting RFID top-up amounts based on the built route
-- **Tier 2 emergency contacts** — local mechanic shops per exit — only once a verification/moderation process exists
-- **Full nationwide toll plaza network data population** — real, verified plaza-to-plaza connectivity and fares across all PH expressways (the routing engine in Phase 4 ships with sample/placeholder network data; full real-data population is its own dedicated task)
-
----
-
-## Monetization Opportunities (Future Consideration)
-
-- Freemium: free core features, paid tier for saved routes / trip history / multi-vehicle tracking
-- Affiliate/referral: RFID top-up deep links via GCash/Maya/convenience store partners
-- Contextual ads or sponsored placements in Route Briefing (gas stations, food stops, tire shops at specific exits)
-- B2B: bulk route-cost estimation and reporting for logistics/fleet operators
-
-*Not a priority for Phase 1 — trust and word-of-mouth come first.*
-
----
-
-## Data Principles
-
-- Firestore collections are structured so content (fares, contacts, guide entries) can be updated by editing the database directly — no app redeploy required
-- Every emergency contact record requires: agency name, coverage area/roads, phone number, tap-to-call format, and last-verified date
-- Toll fare data supports multi-operator trips and returns a **per-operator breakdown**, never a single blended total
-- All placeholder data (fares, phone numbers) flagged clearly in code (`// TODO(data):`) until verified against official sources
-
----
-
-## Known Risks
-
-- **Data accuracy is existential.** A wrong toll estimate or dead emergency number actively harms trust — this is the core risk to manage above all else.
-- **Toll rates and operator coverage change over time** — needs a sustainable process for periodic verification, not a one-time data entry.
-- **Low usage frequency** for casual drivers (few trips per year) — Phase 2's Route Briefing and Checklist are meant to counter this by giving reasons to open the app before *and* during a trip.
-- **Official operator apps could add similar features** — the app's moat is the unified multi-operator experience and route-specific local knowledge, not the calculator alone.
-
----
-
-## Roadmap Overview
-
-```
-Phase 0 — Foundation ✅
-  └─ Flutter project setup, Firebase/Firestore connection, schema design
-
-Phase 1 — Core MVP ✅
-  ├─ Toll Calculator (multi-operator breakdown)
-  ├─ Quick Guide
-  └─ Emergency Contacts (Tier 1, verified only)
-
-Phase 2 — Companion Depth ✅
-  ├─ Pre-Trip Checklist
-  └─ Route Briefing
-
-Phase 2.5 — Aero Rebrand & Visual Identity ✅
-  ├─ Full UI/UX rebuild matching reference design
-  ├─ Bottom tab navigation
-  └─ Native animated mascot (offline-safe, no WebView)
-
-Phase 3 — Polish & Trust ✅
-  ├─ Last-verified indicators
-  ├─ Offline caching (shared_preferences)
-  └─ Feedback / correction mechanism (write-only reports)
-
-Phase 3.5 — Real Data Verification 🔄
-  ├─ Tier 1 emergency contacts ✅ verified
-  └─ Toll fare matrix ⬜ pending
-
-Phase 4 — Routing Engine & Personalization Core ✅
-  ├─ Free exit-to-exit routing engine (graph BFS + operator boundary detection)
-  ├─ Manual RFID balance tracking + dynamic low-balance warnings
-  ├─ Recent Routes: auto-history + save favorites + tap-to-recalculate
-  └─ Offline persistence via SharedPreferences (zero-login)
-
-Phase 5 — Accounts & Sync (tentative, not committed)
-  ├─ Login / sign-up
-  ├─ Personalized greeting
-  └─ Cross-device sync
-
-Phase 6 — v2
-  ├─ Fuel comparison
-  ├─ Smart checklist
-  ├─ Tier 2 local mechanic listings (verification process required first)
-  └─ Full nationwide toll plaza network data population
+```dart
+// Example rule from lib/data/toll_rates_data.dart
+TollChargeRule(
+  id: 'rule_star_tanauan_sto_tomas',
+  expressway: 'STAR',
+  operator: 'autosweep',
+  collectionType: 'closedSystem',
+  entryPlazaId: 'star_tanauan',
+  exitPlazaId: 'star_sto_tomas',
+  fareClass1: 14.0,
+  fareClass2: 29.0,
+  fareClass3: 43.0,
+  effectiveFrom: DateTime(2024, 5, 1),
+  sourceName: 'TRB Approved Toll Rate Matrix for STAR Tollway (May 2024)',
+  sourceUrl: 'https://trb.gov.ph/index.php/toll-rates/star-tollway-toll-rate',
+  ratesLastUpdated: DateTime(2026, 8, 19),
+  notes: 'STAR Closed System OD: Tanauan to Sto. Tomas',
+),
 ```
 
-**Deployment path:**
-1. Local device testing during development (Flutter hot reload, USB debugging/emulator)
-2. Shareable APK for informal testing (Android)
-3. Public release — Google Play first (cheaper, faster review), Apple App Store once stable (requires active Apple Developer account)
+### Steps to Update Rates:
+1. Open [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart).
+2. Locate the specific expressway and entry/exit segment.
+3. Update `fareClass1`, `fareClass2`, and `fareClass3`.
+4. Update `ratesLastUpdated` (and `effectiveFrom`) to reflect the latest TRB implementation date.
+5. Run the test suite to verify route calculation correctness:
+   ```bash
+   flutter test
+   ```
 
 ---
 
-## How to Update Toll Rates After a TRB Announcement
+## 📦 Android APK Testing
 
-All manually editable toll fare data in Aero is stored in a single, clearly organized file:
-👉 [`lib/data/toll_rates_data.dart`](file:///c:/Users/USER/project/Toll/lib/data/toll_rates_data.dart)
+To build the release APK for distribution and testing on physical Android devices:
 
-### Quick Update Steps:
-1. Open [`lib/data/toll_rates_data.dart`](file:///c:/Users/USER/project/Toll/lib/data/toll_rates_data.dart).
-2. Locate the expressway section (e.g. `STAR`, `SLEX`, `SKYWAY`, `NLEX`, `CALAX`, `SCTEX`, `TPLEX`, `CAVITEX`, `MCX`, `NAIAX`, etc.).
-3. Update the fare values for the entry/exit combination:
-   - `fareClass1`: Class 1 rate (cars, SUVs, motorcycles ≥400cc)
-   - `fareClass2`: Class 2 rate (buses, 2-axle trucks)
-   - `fareClass3`: Class 3 rate (heavy trucks, trailers)
-4. Update `ratesLastUpdated` (or `effectiveFrom`) to the date of the change or announcement (e.g. `DateTime(2026, 8, 20)`).
-   > **Note:** Whenever you change any fare value, always update the `ratesLastUpdated` date for that rule so the app accurately reflects the latest update date in the calculator UI.
-5. Save the file. Flutter hot reloads automatically, and all route calculations will immediately use the new rates!
+```bash
+flutter build apk --release
+```
+
+**Output APK location:**
+```
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+### Installation Instructions for Testers:
+1. Public testers must receive only **`app-release.apk`**, never `app-debug.apk` (which contains debugging overhead and unoptimized assets).
+2. Transfer `app-release.apk` to your Android device.
+3. Open the APK file on your device and follow the prompts to install (enable *"Install from unknown sources"* if prompted).
+4. **Security Warning:** Always download the APK only from the official Aero GitHub repository releases or trusted team distribution links.
+
+### Release Signing Setup (For Developers)
+
+Release builds strictly require a private Android release keystore. Falling back to debug signing for release builds is disabled for security compliance.
+
+1. **Generate a private release keystore** (if you don't have one):
+   ```bash
+   keytool -genkey -v -keystore android/app/release.keystore -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+2. **Create `android/key.properties`** with your private credentials:
+   ```properties
+   storePassword=<your-keystore-password>
+   keyPassword=<your-key-password>
+   keyAlias=upload
+   storeFile=release.keystore
+   ```
+3. **Keep Keystores Private**: `android/key.properties` and `*.keystore` / `*.jks` are gitignored. **NEVER** commit keystores or signing passwords to source control or share them publicly.
+
+---
+
+## 🔒 Security & Data Privacy
+
+- **Read-Only Public Data**: All expressway toll matrices, plaza definitions, emergency contacts, and guide content are strictly read-only for client SDKs. Client-side modifications, updates, and deletes are denied via Firestore Security Rules.
+- **Write-Only Community Reports**: The `dataReports` collection permits client creation only so users can report outdated fares or numbers, while preventing client reads or tampering.
+- **Zero Account Footprint**: Aero does not collect personally identifiable information (PII). Driver names and RFID wallet balances are stored strictly locally on the user's device via `SharedPreferences`.
+- **Credential Protection**: Release signing keystores, `key.properties`, `.env` files, and Firebase service account credentials are gitignored and must never be committed to source control or distributed to testers.
+
+---
+
+## 📁 Project Structure
+
+```
+Toll/
+├── assets/
+│   ├── images/              # Mascot artwork, app icons, and logos
+│   └── screenshots/         # Real screenshots for documentation
+├── lib/
+│   ├── data/                # Manually maintained toll rate matrices & plazas
+│   │   ├── toll_plazas_data.dart
+│   │   ├── toll_rates_data.dart
+│   │   └── toll_segments_data.dart
+│   ├── models/              # Data models (TollPlaza, Route, RecentTrip, etc.)
+│   ├── screens/             # UI Screens (Home, TollCalculator, Guide, Checklist, etc.)
+│   ├── services/            # CacheService, TollService, RoutingEngine
+│   ├── theme.dart           # Light & Dark theme definitions and tokens
+│   └── main.dart            # Application entrypoint
+├── test/                    # Comprehensive unit and widget test suites
+├── firestore.rules          # Firestore Security Rules definition
+└── pubspec.yaml             # Flutter project dependencies & assets
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions to update toll rates, add new expressway plazas, or improve route calculations are welcome!
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b update/nlex-rates`.
+3. Make your edits in `lib/data/toll_rates_data.dart` with official TRB source links.
+4. Verify with `flutter test` and `flutter analyze`.
+5. Submit a Pull Request.
+
+---
+
+## 📄 License
+
+License: To be added

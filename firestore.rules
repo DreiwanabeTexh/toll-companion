@@ -1,7 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Reference Data: Public read-only access (writes strictly disabled for client SDKs)
+
+    // Validation helper functions
+    function isString(data, field, minLen, maxLen) {
+      return data[field] is string &&
+             data[field].size() >= minLen &&
+             data[field].size() <= maxLen;
+    }
+
+    // Validates that contextData map contains ONLY fixed, known keys, and each value is a string <= 100 chars
+    function isValidContextMap(m) {
+      return m is map &&
+             m.keys().hasOnly(['displayNumber', 'coverageArea', 'origin', 'destination', 'vehicleClass', 'totalFare']) &&
+             (!('displayNumber' in m) || (m.displayNumber is string && m.displayNumber.size() <= 100)) &&
+             (!('coverageArea' in m) || (m.coverageArea is string && m.coverageArea.size() <= 100)) &&
+             (!('origin' in m) || (m.origin is string && m.origin.size() <= 100)) &&
+             (!('destination' in m) || (m.destination is string && m.destination.size() <= 100)) &&
+             (!('vehicleClass' in m) || (m.vehicleClass is string && m.vehicleClass.size() <= 100)) &&
+             (!('totalFare' in m) || (m.totalFare is string && m.totalFare.size() <= 100));
+    }
+
+    // Public Reference Data Collections (Read-Only)
+    // Contains only shared static reference data (plazas, segments, routes, contacts, FAQs, template checklist items, briefings).
+    // Zero user-specific data (recent routes, checklist progress, driver profile/wallet balances are saved strictly on-device).
     match /tollSegments/{doc} {
       allow read: if true;
       allow write: if false;
@@ -37,16 +59,37 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Phase 3 Feedback Mechanism: Write-only client submissions for community reports
+    // Community Reports Collection (Write-Only Client Submissions with Strict Validation)
+    // - Clients CANNOT read, update, or delete reports.
+    // - Clients CANNOT send or set 'status' (reserved exclusively for admin/server workflows).
+    // - Requires 'timestamp == request.time'.
+    // - Enforces strict field whitelist, string length bounds, and contextData key validation.
     match /dataReports/{doc} {
-      allow create: if true;
       allow read, update, delete: if false;
+      allow create: if request.resource.data.keys().hasOnly([
+                         'reportType', 'targetId', 'targetName',
+                         'issueDescription', 'appVersion', 'contextData',
+                         'timestamp'
+                       ]) &&
+                       request.resource.data.keys().hasAll([
+                         'reportType', 'targetId', 'targetName',
+                         'issueDescription', 'appVersion', 'timestamp'
+                       ]) &&
+                       isString(request.resource.data, 'reportType', 1, 50) &&
+                       isString(request.resource.data, 'targetId', 1, 100) &&
+                       isString(request.resource.data, 'targetName', 1, 200) &&
+                       isString(request.resource.data, 'issueDescription', 1, 1000) &&
+                       isString(request.resource.data, 'appVersion', 1, 30) &&
+                       request.resource.data.timestamp == request.time &&
+                       (
+                         !('contextData' in request.resource.data) ||
+                         isValidContextMap(request.resource.data.contextData)
+                       );
     }
 
-    // Default: Deny all other collections
+    // Default Catch-All Denial Rule
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
-

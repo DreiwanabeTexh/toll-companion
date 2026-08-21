@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import '../models/checklist_item.dart';
 import '../models/route_model.dart';
+import '../services/cache_service.dart';
 import '../services/checklist_service.dart';
 import '../theme.dart';
 
 /// Pre-Trip Checklist screen (Phase 2).
 ///
-/// Features an in-session toggleable checklist loosely connected
-/// to the user's selected route, with category grouping and progress tracking.
+/// Features a persistent toggleable checklist loosely connected
+/// to the user's selected route, with category grouping, autosaved progress, and reset support.
 class ChecklistScreen extends StatefulWidget {
   final ChecklistService? checklistService;
+  final CacheService? cacheService;
   final RouteModel? route;
   final Set<String>? involvedOperators;
 
   const ChecklistScreen({
     super.key,
     this.checklistService,
+    this.cacheService,
     this.route,
     this.involvedOperators,
   });
@@ -26,6 +29,7 @@ class ChecklistScreen extends StatefulWidget {
 
 class _ChecklistScreenState extends State<ChecklistScreen> {
   late final ChecklistService _checklistService;
+  late final CacheService _cacheService;
   late final Stream<List<ChecklistItem>> _checklistStream;
   final Set<String> _checkedItemIds = {};
   bool _isSeeding = false;
@@ -34,7 +38,18 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   void initState() {
     super.initState();
     _checklistService = widget.checklistService ?? ChecklistService();
+    _cacheService = widget.cacheService ?? CacheService();
     _checklistStream = _checklistService.getChecklistItems();
+    _loadSavedProgress();
+  }
+
+  Future<void> _loadSavedProgress() async {
+    final saved = await _cacheService.getChecklistProgress();
+    if (mounted && saved.isNotEmpty) {
+      setState(() {
+        _checkedItemIds.addAll(saved);
+      });
+    }
   }
 
   void _toggleItem(String id) {
@@ -45,12 +60,62 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         _checkedItemIds.add(id);
       }
     });
+    _cacheService.saveChecklistProgress(_checkedItemIds);
   }
 
-  void _resetChecklist() {
-    setState(() {
-      _checkedItemIds.clear();
-    });
+  Future<void> _confirmResetChecklist() async {
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AeroColors.surfaceCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AeroColors.border),
+        ),
+        title: Text(
+          'Reset Checklist?',
+          style: TextStyle(
+            color: AeroColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to uncheck all items? Your saved progress will be cleared.',
+          style: TextStyle(
+            color: AeroColors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AeroColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AeroColors.errorRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReset == true && mounted) {
+      setState(() {
+        _checkedItemIds.clear();
+      });
+      await _cacheService.saveChecklistProgress(_checkedItemIds);
+    }
   }
 
   @override
@@ -71,7 +136,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         actions: [
           if (_checkedItemIds.isNotEmpty)
             TextButton.icon(
-              onPressed: _resetChecklist,
+              onPressed: _confirmResetChecklist,
               icon: Icon(Icons.restart_alt, size: 18, color: AeroColors.neonBlue),
               label: Text('Reset', style: TextStyle(color: AeroColors.neonBlue)),
             ),
@@ -323,6 +388,31 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                               ? AeroColors.successEmerald
                               : AeroColors.neonBlue,
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Helper text: Autosaved progress
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_done_outlined,
+                      size: 14,
+                      color: AeroColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Your progress is saved automatically.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AeroColors.textSecondary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
