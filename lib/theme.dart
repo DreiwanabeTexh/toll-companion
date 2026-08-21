@@ -270,6 +270,17 @@ class AeroTheme {
           ),
           labelStyle: const TextStyle(color: Color(0xFF8A919F)),
         ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: const Color(0xFF1F2020),
+          contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+          actionTextColor: const Color(0xFF0088FF),
+          elevation: 6,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: Color(0xFF2A2A2A)),
+          ),
+        ),
       );
 
   static ThemeData get lightTheme => ThemeData.light(useMaterial3: true).copyWith(
@@ -338,6 +349,17 @@ class AeroTheme {
             borderSide: const BorderSide(color: Color(0xFF0070F3), width: 1.5),
           ),
           labelStyle: const TextStyle(color: Color(0xFF64748B)),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: const Color(0xFF1E293B),
+          contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+          actionTextColor: const Color(0xFF0070F3),
+          elevation: 6,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: Color(0xFF334155)),
+          ),
         ),
       );
 }

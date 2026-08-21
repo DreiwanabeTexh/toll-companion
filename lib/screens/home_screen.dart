@@ -4,6 +4,7 @@ import '../services/cache_service.dart';
 import '../theme.dart';
 import '../widgets/aero_animations.dart';
 import '../widgets/aero_mascot.dart';
+import '../widgets/aero_snackbar.dart';
 import 'main_navigation_scaffold.dart';
 
 /// Aero Home Screen — Driver Dashboard featuring local RFID balance tracking,
@@ -156,39 +157,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (context.mounted) {
                   Navigator.pop(context);
                   setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: AeroColors.successEmerald,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '$operatorName balance updated to ₱${newAmount.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      backgroundColor: AeroColors.surfaceCard,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(
-                          color: AeroColors.successEmerald.withValues(alpha: 0.5),
-                          width: 1.2,
-                        ),
-                      ),
-                      duration: const Duration(seconds: 3),
-                    ),
+                  AeroSnackBar.showSuccess(
+                    context,
+                    '$operatorName balance updated to ₱${newAmount.toStringAsFixed(2)}',
                   );
                 }
               }

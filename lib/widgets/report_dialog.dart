@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/report_service.dart';
+import 'aero_snackbar.dart';
 
 /// Lightweight modal dialog for reporting outdated or incorrect data.
 ///
@@ -72,27 +73,7 @@ class _ReportDialogState extends State<ReportDialog> {
 
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle, color: AeroColors.successEmerald, size: 18),
-              SizedBox(width: 10),
-              Text(
-                "Thanks, we'll review this.",
-                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-            ],
-          ),
-          backgroundColor: AeroColors.surfaceContainer,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: AeroColors.border),
-          ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      AeroSnackBar.showSuccess(context, "Thanks, we'll review this.");
     }
   }
 

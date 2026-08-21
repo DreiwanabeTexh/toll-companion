@@ -5,6 +5,7 @@ import '../theme.dart';
 import '../widgets/aero_animations.dart';
 import '../widgets/aero_mascot.dart';
 import '../widgets/aero_offline_banner.dart';
+import '../widgets/aero_snackbar.dart';
 import 'guide_detail_screen.dart';
 import 'main_navigation_scaffold.dart';
 
@@ -67,9 +68,7 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
     List<GuideEntry> entries,
   ) {
     if (entries.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No FAQs currently filed under ${cat.title}.')),
-      );
+      AeroSnackBar.showInfo(context, 'No FAQs currently filed under ${cat.title}.');
       return;
     }
 
@@ -465,12 +464,9 @@ class _QuickGuideScreenState extends State<QuickGuideScreen> {
                                 ),
                               );
                             } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'No troubleshooting entry available for ${cat.title}.',
-                                  ),
-                                ),
+                              AeroSnackBar.showInfo(
+                                context,
+                                'No troubleshooting entry available for ${cat.title}.',
                               );
                             }
                           },

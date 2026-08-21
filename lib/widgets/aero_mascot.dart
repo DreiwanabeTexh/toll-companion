@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../services/cache_service.dart';
 import '../theme.dart';
+import 'aero_snackbar.dart';
 
 /// Asset path for the authentic Aero bird mascot.
 const String kAeroMascotAsset = 'assets/images/aero_mascot.png';
@@ -687,23 +688,7 @@ class AeroHomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 onNameChanged?.call(newName);
                 if (editCtx.mounted) Navigator.of(editCtx).pop();
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: AeroColors.surfaceCard,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: AeroColors.border),
-                      ),
-                      content: Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: AeroColors.successEmerald, size: 18),
-                          const SizedBox(width: 8),
-                          Text('Driver name updated to $newName'),
-                        ],
-                      ),
-                    ),
-                  );
+                  AeroSnackBar.showSuccess(context, 'Driver name updated to $newName');
                 }
               }
             },

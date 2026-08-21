@@ -4,6 +4,7 @@ import '../models/route_model.dart';
 import '../services/cache_service.dart';
 import '../services/checklist_service.dart';
 import '../theme.dart';
+import '../widgets/aero_snackbar.dart';
 
 /// Pre-Trip Checklist screen (Phase 2).
 ///
@@ -115,6 +116,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         _checkedItemIds.clear();
       });
       await _cacheService.saveChecklistProgress(_checkedItemIds);
+      if (mounted) {
+        AeroSnackBar.showInfo(context, 'Pre-trip checklist reset');
+      }
     }
   }
 

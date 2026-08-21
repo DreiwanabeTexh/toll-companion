@@ -5,12 +5,13 @@
   # Aero
   ### A Philippine Expressway Driving Companion
 
-  Aero helps drivers estimate Philippine expressway tolls, view Autosweep and Easytrip totals, plan trips, save recent routes, and calculate fuel costs in one unified app.
+  Plan Philippine expressway trips, estimate tolls, track RFID costs, and prepare for the road.
 
   <p align="center">
     <code>🛣️ Toll Estimates</code> &nbsp;
     <code>💳 RFID Breakdown</code> &nbsp;
-    <code>⛽ Fuel Planning</code>
+    <code>⛽ Fuel Planning</code> &nbsp;
+    <code>🆘 Road Assistance</code>
   </p>
 
 </div>
@@ -23,21 +24,29 @@
   <img src="assets/screenshots/home.png" alt="Home Dashboard" width="45%" />
   &nbsp;
   <img src="assets/screenshots/toll-calculator.png" alt="Toll Calculator" width="45%" />
+  <br /><br />
+  <img src="assets/screenshots/quick-guide.png" alt="Quick Guide" width="45%" />
+  &nbsp;
+  <img src="assets/screenshots/emergency.png" alt="Emergency Assistance" width="45%" />
 </div>
 
 <br />
 
 <details>
-<summary><b>📷 View More Screens (Recent Routes, Themes, & Settings)</b></summary>
+<summary><b>📷 More Features (Vehicle Classes, Fuel Estimator, Checklist, & Settings)</b></summary>
 <br />
 <div align="center">
+  <img src="assets/screenshots/vehicle-class.png" alt="Vehicle Class Selector" width="45%" />
+  &nbsp;
   <img src="assets/screenshots/recent-routes.png" alt="Recent Routes" width="45%" />
-  &nbsp;
-  <img src="assets/screenshots/settings.png" alt="Settings & Theme" width="45%" />
   <br /><br />
-  <img src="assets/screenshots/light-mode.png" alt="Light Mode" width="45%" />
+  <img src="assets/screenshots/fuel-estimator.png" alt="Fuel Budget Estimator" width="45%" />
   &nbsp;
-  <img src="assets/screenshots/dark-mode.png" alt="Dark Mode" width="45%" />
+  <img src="assets/screenshots/light-mode.png" alt="Light Mode Theme" width="45%" />
+  <br /><br />
+  <img src="assets/screenshots/settings.png" alt="Settings & Profile" width="45%" />
+  &nbsp;
+  <img src="assets/screenshots/checklist.png" alt="Pre-Trip Safety Checklist" width="45%" />
 </div>
 </details>
 
@@ -47,45 +56,61 @@
 
 | Feature | Description |
 |---|---|
-| 🛣️ **Toll Calculator** | TRB-matrix-based toll estimates across 11+ Philippine expressways (STAR, SLEX, Skyway, NLEX, SCTEX, CALAX, CAVITEX, MCX, NAIAX, TPLEX, CCLEX). |
-| 💳 **Autosweep & Easytrip** | Clear per-operator RFID balance breakdown — never merged into a single confusing total. |
-| ⛽ **Fuel Budget** | Integrated fuel cost estimator with customizable pump prices and one-tap vehicle presets (Sedan, SUV, Van/Pickup). |
-| 🧭 **Route Options** | Interactive toggle to switch between elevated Skyway and surface SLEX routes where supported. |
-| 🕘 **Recent Trips** | Automatic trip logging with one-tap favorite pinning and instant route re-calculation. |
-| 🌗 **Light & Dark Mode** | Seamless theme switching between high-contrast Light Mode and sleek Nocturnal Dark Mode. |
-| 📶 **Offline Ready** | Fully functional without internet signal using cached local toll rate matrices. |
-| ✏️ **Editable Toll Rates** | Single-file rate structure in [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart) for fast updates after TRB tariff announcements. |
+| 🛣️ **Toll Calculator** | Estimate expressway tolls from selected origin and destination across 11+ Philippine expressways. |
+| 🚗 **Vehicle Classes** | Class 1, 2, and 3 options with clear vehicle icons. |
+| 💳 **RFID Breakdown** | View Autosweep and Easytrip subtotals. |
+| ⛽ **Fuel Estimator** | Estimate fuel cost for your trip. |
+| 🕘 **Recent Routes** | Reopen previously calculated trips quickly. |
+| ✅ **Trip Checklist** | Prepare before leaving; progress is saved locally. |
+| 🆘 **Emergency Assistance** | Quick access to helpful road/emergency contacts. |
+| 📖 **Quick Guide** | Basic expressway and RFID guidance. |
+| 🌗 **Appearance Modes** | Light, Dark, and System themes. |
+| 📶 **Offline Ready** | Use locally stored toll-rate data when offline. |
 
 ---
 
-## 🚀 Quick Start
+## ⚠️ Toll Estimate Notice
+
+> **Toll estimate notice:** Aero provides toll estimates based on manually maintained TRB rate matrices. Actual toll fees may vary. Always check official advisories and toll-plaza signage before travelling.
+
+*Aero is an independent open-source utility and is not officially affiliated with, endorsed by, or verified by the Toll Regulatory Board (TRB), San Miguel Corporation (SMC), Metro Pacific Tollways Corporation (MPTC), Autosweep RFID, or Easytrip RFID.*
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Flutter](https://flutter.dev/) (v3.19+)
+- **Language**: [Dart](https://dart.dev/)
+- **Backend / Database**: [Cloud Firestore](https://firebase.google.com/docs/firestore) (Public reference catalog & report submissions)
+- **Local Persistence**: `SharedPreferences` (Driver profile, wallet balances, trip history, and checklist state)
+- **Platform Features**: `url_launcher` (Direct phone dialer integration for hotline calls)
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (v3.19+)
-- Android Studio / VS Code with Flutter extension
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) installed and added to your `PATH`
+- Android Studio or VS Code with Flutter extension
 - Connected Android device or emulator
 
-### Install and Run
+### Installation & Commands
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/DreiwanabeTexh/toll-companion.git
 cd toll-companion
 
-# 2. Install dependencies
+# 2. Fetch dependencies
 flutter pub get
 
-# 3. Launch application on connected device
+# 3. Launch application
 flutter run
-```
 
-### Test Suite & Analysis
-
-```bash
-# Run unit and widget test suite
+# 4. Run test suite
 flutter test
 
-# Run static analysis check
+# 5. Run static analysis
 flutter analyze
 ```
 
@@ -100,13 +125,13 @@ flutter build apk --release
 
 ## 🛠️ Updating Toll Rates
 
-All expressway toll fare rules are stored in a single structured file:
+Expressway fare rules are centralized in a single structured data file:
 👉 [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart)
 
-### Real Code Structure Example
+### Real Code Example
 
 ```dart
-// Example rule from lib/data/toll_rates_data.dart
+// Rule definition in lib/data/toll_rates_data.dart
 TollChargeRule(
   id: 'rule_star_tanauan_sto_tomas',
   expressway: 'STAR',
@@ -125,29 +150,11 @@ TollChargeRule(
 ),
 ```
 
-### Steps to Update Rates:
+### Update Procedure:
 1. Open [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart).
-2. Locate the specific expressway entry/exit rule.
-3. Update `fareClass1`, `fareClass2`, and `fareClass3` values.
-4. Update `ratesLastUpdated` (and `effectiveFrom`) to the date of the TRB announcement.
-5. Run tests and static analysis:
-   ```bash
-   flutter test
-   flutter analyze
-   ```
-6. Rebuild the release APK if bundling updated rates for distribution.
-
----
-
-## ⚠️ Disclaimer & Security
-
-> [!IMPORTANT]
-> **Toll Estimate Disclaimer**
-> Aero provides toll estimates based on manually maintained TRB rate matrices. Actual toll fees may vary due to newly gazetted rate adjustments, barrier configurations, or operator promos. Always check official advisories and toll-plaza signage before travelling.
-
-> [!NOTE]
-> **Developer Security & Keystore Privacy**
-> Release builds strictly require a private Android release keystore configured via `android/key.properties`. Keystores, signing passwords, and credential files are gitignored and must never be committed to source control or shared publicly. Public testers should download `app-release.apk` only from official repository releases.
+2. Update `fareClass1`, `fareClass2`, and `fareClass3` values.
+3. Update `ratesLastUpdated` and `effectiveFrom` timestamps.
+4. Verify changes: `flutter test` and `flutter analyze`.
 
 ---
 
@@ -156,29 +163,28 @@ TollChargeRule(
 ```
 Toll/
 ├── assets/
-│   ├── images/              # Logo artwork, mascot graphics, and app icons
-│   └── screenshots/         # Real screenshots for documentation
+│   ├── images/              # Logos, mascots, and app branding assets
+│   └── screenshots/         # Real application screenshots in PNG format
 ├── lib/
-│   ├── data/                # Toll rate matrices, plaza nodes, & segment connectivity
+│   ├── data/                # Toll rate matrices & expressway network definitions
 │   ├── models/              # Data models (TollPlaza, Route, RecentTrip, etc.)
 │   ├── screens/             # UI Screens (Home, TollCalculator, Guide, Checklist, etc.)
-│   ├── services/            # CacheService, TollService, RoutingEngine
-│   ├── theme.dart           # Light & Dark theme design system
+│   ├── services/            # CacheService, RoutingEngine, FirestoreService
+│   ├── theme.dart           # Light & Dark theme definitions
 │   └── main.dart            # Application entrypoint
 ├── test/                    # Comprehensive unit and widget test suites
 ├── firestore.rules          # Firestore Security Rules definition
-└── pubspec.yaml             # Flutter dependencies & asset declarations
+└── pubspec.yaml             # Dependencies & asset declarations
 ```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions to update toll rates, add new expressway plazas, or improve route calculations are welcome!
 1. Fork the repository.
-2. Create a feature branch: `git checkout -b update/nlex-rates`.
-3. Make your edits in [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart) with official TRB source links.
-4. Verify with `flutter test` and `flutter analyze`.
+2. Create a feature branch: `git checkout -b update/toll-rates`.
+3. Apply edits in [`lib/data/toll_rates_data.dart`](lib/data/toll_rates_data.dart).
+4. Run `flutter test` and `flutter analyze` to confirm clean build.
 5. Submit a Pull Request.
 
 ---

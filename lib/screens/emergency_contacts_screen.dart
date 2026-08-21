@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../widgets/aero_animations.dart';
 import '../widgets/aero_mascot.dart';
 import '../widgets/aero_offline_banner.dart';
+import '../widgets/aero_snackbar.dart';
 import '../widgets/report_dialog.dart';
 
 /// Aero Emergency Contacts Screen featuring a dedicated animated hero mascot alongside the heading.
@@ -55,20 +56,16 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     try {
       final launched = await launchUrl(uri);
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Could not open dialer for ${contact.displayNumber}',
-            ),
-          ),
+        AeroSnackBar.showError(
+          context,
+          'Could not open dialer for ${contact.displayNumber}',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Dialer error: $e'),
-          ),
+        AeroSnackBar.showError(
+          context,
+          'Dialer error: $e',
         );
       }
     }
